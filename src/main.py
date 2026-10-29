@@ -8,6 +8,7 @@ from pathlib import Path
 import orjson
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.requests import Request
 from sse_starlette.sse import EventSourceResponse
 
 from .inventory import inventory
@@ -22,21 +23,38 @@ subscribers: set[asyncio.Queue] = set()
 
 
 async def _consume_session() -> None:
-    """Background task: tail active session + auto-switch khi session file đổi."""
+    """Background task: tail session hiện pinned (nếu có) hoặc active.
+
+    - Nếu state.pinned_session_file set → tail file đó, catch-up từ đầu.
+    - Nếu không → tail session active (newest mtime), auto-switch khi file mới xuất hiện.
+    """
     while True:
-        sess = find_active_session()
-        if not sess:
-            await asyncio.sleep(2)
-            continue
+        if state.pinned_session_file:
+            sess = Path(state.pinned_session_file)
+            if not sess.exists():
+                await asyncio.sleep(2)
+                continue
+            # Pin mode: catch-up from offset 0 để load full history
+            start_offset = 0
+        else:
+            sess = find_active_session()
+            if not sess:
+                await asyncio.sleep(2)
+                continue
+            # Auto mode: skip existing content, chỉ bắt event mới
+            start_offset = sess.stat().st_size
+
         state.reset_session(str(sess), sess.stem)
-        size = sess.stat().st_size
-        # Tail hiện tại cho đến khi phát hiện session file mới hơn
         try:
-            async for raw in tail_file(sess, start_offset=size):
-                # Check nếu có session file mới hơn (user mở session mới)
-                current = find_active_session()
-                if current and current != sess and current.stat().st_mtime > sess.stat().st_mtime + 5:
-                    break  # restart loop với session mới
+            async for raw in tail_file(sess, start_offset=start_offset):
+                # Nếu user pin session khác → restart loop
+                if state.pinned_session_file and state.pinned_session_file != str(sess):
+                    break
+                # Nếu auto mode và có session newer → switch
+                if not state.pinned_session_file:
+                    current = find_active_session()
+                    if current and current != sess and current.stat().st_mtime > sess.stat().st_mtime + 5:
+                        break
                 for ev in parse_event(raw):
                     state.apply(ev)
                     payload = orjson.dumps(ev).decode()
@@ -109,6 +127,29 @@ async def health():
 async def api_inventory():
     """MCP servers + plugins + skills đã cài trong ~/.claude/."""
     return Response(orjson.dumps(inventory()), media_type="application/json")
+
+
+@app.post("/api/pin-session")
+async def pin_session(request: Request):
+    """Pin dashboard theo dõi 1 session cụ thể qua session_id (basename).
+
+    Body: {"id": "<session_uuid>"} → tìm file ~/.claude/projects/*/<id>.jsonl
+    hoặc {"clear": true} để unpin, trở về auto-mode.
+    """
+    body = await request.json()
+    if body.get("clear"):
+        state.pinned_session_file = None
+        return {"ok": True, "mode": "auto"}
+    sid = body.get("id", "").strip()
+    if not sid:
+        return {"ok": False, "error": "missing id"}
+    # Resolve id → full path
+    projects_dir = Path.home() / ".claude" / "projects"
+    matches = list(projects_dir.glob(f"*/{sid}.jsonl"))
+    if not matches:
+        return {"ok": False, "error": f"session {sid[:8]} not found"}
+    state.pinned_session_file = str(matches[0])
+    return {"ok": True, "mode": "pinned", "file": str(matches[0]), "id": sid}
 
 
 if __name__ == "__main__":

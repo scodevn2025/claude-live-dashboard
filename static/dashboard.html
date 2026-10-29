@@ -229,6 +229,44 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 
 <div class="card" style="margin-bottom: 12px;">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <div class="lbl">file edits · đang/vừa sửa gần đây (realtime)</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="edits-count">0 ops</div>
+  </div>
+  <div id="edits-list" class="edits-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ event Edit/Write/Read…</div>
+  </div>
+</div>
+
+<style>
+.edits-list { font-size: 11px; max-height: 180px; overflow-y: auto; }
+.edits-list::-webkit-scrollbar { width: 4px; }
+.edits-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+.edit-row { display: grid; grid-template-columns: 48px 18px 60px 1fr auto; gap: 10px; align-items: center; padding: 5px 10px; border-radius: 5px; font-family: 'JetBrains Mono', monospace; transition: background 0.2s; }
+.edit-row:hover { background: var(--surface-2); }
+.edit-row.live { background: rgba(74,158,255,0.08); border-left: 2px solid var(--accent); padding-left: 8px; border-radius: 0 5px 5px 0; }
+.edit-time { color: var(--text-muted); font-size: 10px; }
+.edit-icon { font-size: 13px; text-align: center; }
+.edit-icon.Write { color: var(--orange); }
+.edit-icon.Edit { color: var(--orange); }
+.edit-icon.Read { color: var(--violet); }
+.edit-icon.Grep { color: var(--green); }
+.edit-icon.Glob { color: var(--green); }
+.edit-icon.Bash { color: var(--accent); }
+.edit-op { font-size: 9px; padding: 1px 7px; border-radius: 8px; text-align: center; font-weight: 500; }
+.edit-op.Write { background: rgba(255,132,81,0.15); color: var(--orange); }
+.edit-op.Edit { background: rgba(255,132,81,0.15); color: var(--orange); }
+.edit-op.Read { background: rgba(162,135,244,0.15); color: var(--violet); }
+.edit-op.Grep { background: rgba(34,209,154,0.12); color: var(--green); }
+.edit-op.Glob { background: rgba(34,209,154,0.12); color: var(--green); }
+.edit-op.Bash { background: rgba(74,158,255,0.12); color: var(--accent); }
+.edit-file { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edit-file .path { color: var(--text-muted); font-size: 10px; }
+.edit-dur { color: var(--text-muted); font-size: 10px; font-style: italic; }
+.edit-dur.running { color: var(--accent); animation: pulse 1.4s ease-in-out infinite; font-weight: 500; }
+</style>
+
+<div class="card" style="margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
     <div class="lbl">sessions · active Claude Code (last 2h)</div>
     <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="sess-counts">—</div>
   </div>
@@ -236,18 +274,22 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 </div>
 
 <style>
-.sess-list { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-.sess-row { display: grid; grid-template-columns: 72px 1fr 90px 90px 70px; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 6px; transition: background 0.2s; }
+.sess-list { font-size: 12px; }
+.sess-row { display: grid; grid-template-columns: 22px 18px 1fr auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 6px; transition: background 0.2s; cursor: default; }
 .sess-row:hover { background: var(--surface-2); }
-.sess-row.live { background: rgba(34,209,154,0.08); border-left: 2px solid var(--green); padding-left: 8px; border-radius: 0 6px 6px 0; }
-.sess-row.recent { background: rgba(74,158,255,0.05); }
-.sess-badge { font-size: 9px; padding: 2px 7px; border-radius: 10px; text-align: center; font-weight: 500; }
-.sess-badge.live { background: rgba(34,209,154,0.2); color: var(--green); animation: pulse 1.5s ease-in-out infinite; }
-.sess-badge.recent { background: rgba(74,158,255,0.15); color: var(--accent); }
-.sess-badge.idle { background: var(--surface-3); color: var(--text-muted); }
-.sess-id { color: var(--text-primary); font-weight: 500; }
-.sess-proj { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-meta { color: var(--text-muted); font-size: 10px; text-align: right; }
+.sess-row.live { background: rgba(74,158,255,0.08); border-left: 2px solid var(--accent); padding-left: 8px; border-radius: 0 6px 6px 0; }
+.sess-row.recent { background: rgba(74,158,255,0.03); }
+.sess-row.pinned { background: rgba(226,117,36,0.15) !important; border-left: 2px solid var(--orange) !important; padding-left: 8px; border-radius: 0 6px 6px 0; }
+.sess-row.pinned::after { content: '📍'; margin-left: 6px; font-size: 11px; }
+.sess-row { cursor: pointer; }
+.sess-num { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: right; }
+.sess-icon { font-size: 14px; width: 16px; text-align: center; }
+.sess-icon.live { color: var(--accent); }
+.sess-icon.recent { color: var(--text-secondary); }
+.sess-icon.idle { color: var(--text-muted); opacity: 0.5; }
+.sess-id { color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-id .project { color: var(--text-muted); font-size: 10px; margin-left: 6px; font-family: 'JetBrains Mono', monospace; }
+.sess-meta { color: var(--text-secondary); font-size: 11px; font-style: italic; }
 .sess-tg { margin-top: 10px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; display: flex; gap: 10px; align-items: center; font-size: 10px; color: var(--text-secondary); }
 .sess-tg i { color: var(--amber); font-size: 14px; }
 </style>
@@ -300,59 +342,103 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
       </linearGradient>
     </defs>
     <g font-family="'JetBrains Mono', monospace" font-size="12" fill="#ececec">
-      <!-- Node: ba -->
-      <g id="node-user" transform="translate(60, 110)">
-        <circle r="34" class="node-rect" stroke="#4a9eff"/>
-        <text y="-2" text-anchor="middle" font-weight="500">ba</text>
-        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3">user</text>
+      <!-- Row 1 (y=55): ba → claude → think → tool bus -->
+      <!-- Row 2 (y=130): tool bus → review ↔ debug ↔ verify ↔ test → result -->
+      <!-- Row 3 (y=200): subagents + background below -->
+
+      <!-- Node ba (user input) -->
+      <g id="node-user" transform="translate(50, 55)">
+        <circle r="28" class="node-rect" stroke="#4a9eff"/>
+        <text y="-2" text-anchor="middle" font-weight="500" font-size="11">ba</text>
+        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3">prompt</text>
       </g>
-      <!-- Node: claude -->
-      <g id="node-claude" transform="translate(250, 110)">
-        <rect x="-70" y="-32" width="140" height="64" rx="12" class="node-rect active" stroke="#4a9eff"/>
-        <text y="-6" text-anchor="middle" font-weight="500" fill="#4a9eff">claude main</text>
-        <text y="12" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-claude-sub">harness</text>
-        <text y="26" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-claude-turns">0 turns</text>
+      <!-- Claude main -->
+      <g id="node-claude" transform="translate(200, 55)">
+        <rect x="-60" y="-26" width="120" height="52" rx="10" class="node-rect active" stroke="#4a9eff"/>
+        <text y="-6" text-anchor="middle" font-weight="500" font-size="11" fill="#4a9eff">claude main</text>
+        <text y="8" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-claude-sub">harness</text>
+        <text y="20" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-claude-turns">0 turns</text>
       </g>
-      <!-- Node: tool bus -->
-      <g id="node-tool" transform="translate(500, 110)">
-        <rect x="-80" y="-32" width="160" height="64" rx="12" class="node-rect" stroke="#4a9eff"/>
-        <text y="-6" text-anchor="middle" font-weight="500" fill="#4a9eff" id="n-tool-name">tool bus</text>
-        <text y="12" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-tool-sub">idle</text>
-        <text y="26" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-tool-count">0 calls</text>
+      <!-- Think -->
+      <g id="node-think" transform="translate(380, 55)">
+        <rect x="-55" y="-24" width="110" height="48" rx="24" class="node-rect" stroke="#a287f4"/>
+        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#a287f4">💭 thinking</text>
+        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-think-tokens">0 tok</text>
       </g>
-      <!-- Node: agent spawn -->
-      <g id="node-agent" transform="translate(760, 50)">
-        <rect x="-70" y="-24" width="140" height="48" rx="10" class="node-rect" stroke="#f58cb5"/>
-        <text y="-2" text-anchor="middle" font-size="11" fill="#f58cb5">subagents</text>
-        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-agent-count">0 spawned</text>
+      <!-- Tool bus -->
+      <g id="node-tool" transform="translate(560, 55)">
+        <rect x="-70" y="-26" width="140" height="52" rx="10" class="node-rect" stroke="#4a9eff"/>
+        <text y="-6" text-anchor="middle" font-weight="500" font-size="11" fill="#4a9eff" id="n-tool-name">tool bus</text>
+        <text y="8" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-tool-sub">idle</text>
+        <text y="20" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-tool-count">0 calls</text>
       </g>
-      <!-- Node: bg tasks -->
-      <g id="node-bg" transform="translate(760, 170)">
-        <rect x="-70" y="-24" width="140" height="48" rx="10" class="node-rect" stroke="#ffb547"/>
-        <text y="-2" text-anchor="middle" font-size="11" fill="#ffb547">background</text>
-        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-bg-count">0 running</text>
+      <!-- Review -->
+      <g id="node-review" transform="translate(760, 55)">
+        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#ffb547"/>
+        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#ffb547">🔍 review</text>
+        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-review">pending</text>
       </g>
-      <!-- Node: result -->
-      <g id="node-result" transform="translate(1000, 110)">
-        <rect x="-70" y="-32" width="140" height="64" rx="12" class="node-rect" stroke="#22d19a"/>
-        <text y="-6" text-anchor="middle" font-weight="500" fill="#22d19a">result</text>
-        <text y="12" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-result-sub">pending</text>
-        <text y="26" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-result-count">0 ok</text>
+      <!-- Debug -->
+      <g id="node-debug" transform="translate(900, 55)">
+        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#ff5c5a"/>
+        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#ff5c5a">🐞 debug</text>
+        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-debug">0 errors</text>
       </g>
-      <!-- Node: back to ba -->
-      <g id="node-user2" transform="translate(1210, 110)">
-        <circle r="34" class="node-rect" stroke="#22d19a"/>
-        <text y="-2" text-anchor="middle" font-weight="500">ba</text>
-        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3">answer</text>
+      <!-- Verify -->
+      <g id="node-verify" transform="translate(1040, 55)">
+        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#4ad9e4"/>
+        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#4ad9e4">✓ verify</text>
+        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-verify">0 pass</text>
+      </g>
+      <!-- Test -->
+      <g id="node-test" transform="translate(1180, 55)">
+        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#22d19a"/>
+        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#22d19a">🧪 test</text>
+        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-test">0 run</text>
+      </g>
+      <!-- Subagents -->
+      <g id="node-agent" transform="translate(560, 160)">
+        <rect x="-60" y="-20" width="120" height="40" rx="8" class="node-rect" stroke="#f58cb5"/>
+        <text y="-2" text-anchor="middle" font-size="10" fill="#f58cb5">👥 subagents</text>
+        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-agent-count">0 spawned</text>
+      </g>
+      <!-- Background tasks -->
+      <g id="node-bg" transform="translate(740, 160)">
+        <rect x="-60" y="-20" width="120" height="40" rx="8" class="node-rect" stroke="#ffb547"/>
+        <text y="-2" text-anchor="middle" font-size="10" fill="#ffb547">⚙ background</text>
+        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-bg-count">0 running</text>
+      </g>
+      <!-- Loops -->
+      <g id="node-loops" transform="translate(920, 160)">
+        <rect x="-60" y="-20" width="120" height="40" rx="8" class="node-rect" stroke="#a287f4"/>
+        <text y="-2" text-anchor="middle" font-size="10" fill="#a287f4">↻ loops/cron</text>
+        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-loops">1 watch</text>
+      </g>
+      <!-- Result → user -->
+      <g id="node-result" transform="translate(1180, 160)">
+        <rect x="-55" y="-22" width="110" height="44" rx="8" class="node-rect" stroke="#22d19a"/>
+        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#22d19a">→ ba</text>
+        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-result-sub">answer</text>
       </g>
 
-      <!-- Edges -->
-      <path id="edge-u-c" d="M94,110 L180,110" class="edge" stroke="#4a4a55" />
-      <path id="edge-c-t" d="M320,110 L420,110" class="edge" stroke="#4a4a55" />
-      <path id="edge-t-a" d="M580,100 Q670,100 690,70" class="edge" stroke="#4a4a55" />
-      <path id="edge-t-b" d="M580,120 Q670,120 690,160" class="edge" stroke="#4a4a55" />
-      <path id="edge-t-r" d="M580,110 L930,110" class="edge" stroke="#4a4a55" />
-      <path id="edge-r-u" d="M1070,110 L1176,110" class="edge" stroke="#4a4a55" />
+      <!-- Main flow edges (top row) -->
+      <path id="edge-u-c" d="M78,55 L140,55" class="edge" stroke="#4a4a55" />
+      <path id="edge-c-think" d="M260,55 L325,55" class="edge" stroke="#4a4a55" />
+      <path id="edge-think-t" d="M435,55 L490,55" class="edge" stroke="#4a4a55" />
+      <path id="edge-c-t" d="M260,55 Q440,20 490,55" class="edge" stroke="#2c3a4c" opacity="0.5" />
+      <path id="edge-t-review" d="M630,55 L710,55" class="edge" stroke="#4a4a55" />
+      <path id="edge-review-debug" d="M810,55 L850,55" class="edge" stroke="#4a4a55" />
+      <path id="edge-debug-verify" d="M950,55 L990,55" class="edge" stroke="#4a4a55" />
+      <path id="edge-verify-test" d="M1090,55 L1130,55" class="edge" stroke="#4a4a55" />
+      <!-- Loop back: debug → tool bus (nếu test fail) -->
+      <path id="edge-loop-back" d="M900,77 Q900,140 740,140 Q500,140 560,77" class="edge" stroke="#ff5c5a" stroke-dasharray="4,3" opacity="0.4" />
+      <!-- Vertical: tool → subagents / bg -->
+      <path id="edge-t-a" d="M560,81 L560,140" class="edge" stroke="#4a4a55" />
+      <path id="edge-t-b" d="M560,81 Q650,100 740,140" class="edge" stroke="#4a4a55" />
+      <path id="edge-t-loops" d="M560,81 Q740,100 920,140" class="edge" stroke="#4a4a55" />
+      <!-- Test → Result → ba -->
+      <path id="edge-test-r" d="M1180,77 L1180,138" class="edge" stroke="#4a4a55" />
+      <path id="edge-t-r" d="M560,81 Q900,180 1125,160" class="edge" stroke="#2c3a4c" opacity="0.4" />
 
       <!-- Particles layer -->
       <g id="particles"></g>
@@ -393,6 +479,37 @@ const KIND_LABEL = {
 let state = { counters: {}, startedAt: Date.now() / 1000, kindTally: {}, ctxTokens: 0, ctxMax: 200000, loops: [] };
 let evTimes = [];
 let activeTools = 0;
+// Track file edit operations realtime
+const EDIT_TOOLS = ['Write', 'Edit', 'Read', 'Grep', 'Glob', 'Bash'];
+const recentEdits = []; // {ts, name, file, duration, status}
+const pendingEdits = new Map(); // tool_use_id → edit entry
+
+function renderEdits() {
+  const list = document.getElementById('edits-list');
+  if (!list || recentEdits.length === 0) return;
+  document.getElementById('edits-count').textContent = `${recentEdits.length} ops · ${pendingEdits.size} đang chạy`;
+  // Newest first, limit 30
+  const items = recentEdits.slice(-30).reverse();
+  list.innerHTML = items.map(e => {
+    const isLive = e.status === 'running';
+    const cls = isLive ? 'live' : '';
+    const icon = {Write:'ti-pencil', Edit:'ti-edit', Read:'ti-file-text', Grep:'ti-search', Glob:'ti-files', Bash:'ti-terminal-2'}[e.name] || 'ti-circle-dot';
+    const timeStr = new Date(e.ts * 1000).toTimeString().slice(0,8);
+    const dur = isLive ? '…' : (e.duration ? e.duration.toFixed(1) + 's' : '');
+    // Split path: show basename bold + dir muted
+    let fileDisplay = e.file || '(no path)';
+    const parts = fileDisplay.split(/[\\/]/);
+    const base = parts[parts.length - 1];
+    const dir = parts.length > 1 ? parts.slice(-3, -1).join('/') + '/' : '';
+    return `<div class="edit-row ${cls}" title="${e.file || ''}">
+      <span class="edit-time">${timeStr}</span>
+      <i class="ti ${icon} edit-icon ${e.name}"></i>
+      <span class="edit-op ${e.name}">${e.name}</span>
+      <span class="edit-file"><b>${base}</b><span class="path"> · ${dir}</span></span>
+      <span class="edit-dur ${isLive ? 'running' : ''}">${dur}</span>
+    </div>`;
+  }).join('');
+}
 
 function ageTimelineRows() {
   const rows = document.querySelectorAll('.tl-row');
@@ -625,6 +742,39 @@ function renderEvent(ev) {
   // Enhancement 1: age older rows (fade out)
   ageTimelineRows();
 
+  // File edits tracking — add vào recentEdits khi tool_use có file_path/summary
+  if (ev.kind === 'tool_use' && EDIT_TOOLS.includes(ev.name)) {
+    const entry = {
+      ts: ev.ts, name: ev.name,
+      file: ev.payload?.summary || '',
+      status: 'running', duration: null,
+      tool_use_id: ev.payload?.tool_use_id,
+    };
+    recentEdits.push(entry);
+    while (recentEdits.length > 60) recentEdits.shift();
+    if (entry.tool_use_id) pendingEdits.set(entry.tool_use_id, entry);
+    renderEdits();
+  }
+  if (ev.kind === 'tool_result' && ev.payload?.tool_use_id && pendingEdits.has(ev.payload.tool_use_id)) {
+    const entry = pendingEdits.get(ev.payload.tool_use_id);
+    entry.status = ev.status || 'success';
+    entry.duration = ev.duration;
+    pendingEdits.delete(ev.payload.tool_use_id);
+    renderEdits();
+  }
+
+  // Classify stage review/debug/verify/test — update node + emit particle
+  const stage = classifyStage(ev);
+  if (stage) {
+    emitStageParticle(stage);
+    if (['review','debug','verify','test'].includes(stage)) updateStageNode(stage);
+    if (stage === 'think') {
+      const el = document.getElementById('n-think-tokens');
+      const t = ev.payload?.usage?.thinking || 0;
+      if (el) el.textContent = (t >= 1000 ? (t/1000).toFixed(1) + 'k' : t) + ' tok';
+    }
+  }
+
   // Pipeline reactions
   if (ev.kind === 'tool_use') {
     activeTools++;
@@ -762,12 +912,58 @@ gsap.from('.pipeline', { opacity: 0, y: 20, duration: 0.8, delay: 0.3, ease: 'po
 gsap.from('#pipeline-svg g[id^="node"]', { opacity: 0, y: 20, duration: 0.6, stagger: 0.08, delay: 0.3, ease: 'back.out(1.4)' });
 gsap.from('#pipeline-svg .edge', { opacity: 0, duration: 0.8, stagger: 0.1, delay: 0.6, ease: 'power2.out' });
 
+// Flow stage classifier — detect review/debug/verify/test từ tool payload
+const stageStats = { review: 0, debug: 0, verify: 0, test: 0, think: 0, loop: 1 };
+function classifyStage(ev) {
+  if (ev.kind === 'tool_use') {
+    const name = ev.name || '';
+    const summary = (ev.payload?.summary || '').toLowerCase();
+    if (name === 'Bash') {
+      if (/\btest\b|pytest|jest|npm test|cargo test/.test(summary)) return 'test';
+      if (/\bverify\b|curl.*health|smoke/.test(summary)) return 'verify';
+      if (/\bdebug\b|log|pdb|dmp/.test(summary)) return 'debug';
+    }
+    if (name === 'Grep' || /review|audit|scan/i.test(summary)) return 'review';
+    if (name === 'Agent' && /verify|verif/i.test(summary)) return 'verify';
+  }
+  if (ev.kind === 'assistant_text' && ev.payload?.usage?.thinking > 0) return 'think';
+  if (ev.kind === 'tool_result' && ev.status === 'error') return 'debug';
+  return null;
+}
+function emitStageParticle(stage) {
+  const edges = {
+    think: 'edge-c-think', tool: 'edge-think-t',
+    review: 'edge-t-review', debug: 'edge-review-debug',
+    verify: 'edge-debug-verify', test: 'edge-verify-test',
+    loop: 'edge-loop-back', result: 'edge-test-r',
+  };
+  const colors = {
+    think: '#a287f4', tool: '#4a9eff',
+    review: '#ffb547', debug: '#ff5c5a',
+    verify: '#4ad9e4', test: '#22d19a',
+    loop: '#ff5c5a', result: '#22d19a',
+  };
+  if (edges[stage]) emitParticle(edges[stage], colors[stage]);
+}
+function updateStageNode(stage) {
+  stageStats[stage] = (stageStats[stage] || 0) + 1;
+  const nodeMap = {review:'n-review', debug:'n-debug', verify:'n-verify', test:'n-test'};
+  if (nodeMap[stage]) {
+    const el = document.getElementById(nodeMap[stage]);
+    if (el) el.textContent = stageStats[stage] + ' ' + ({review:'ops', debug:'errors', verify:'pass', test:'run'})[stage];
+    pulseNode('node-' + stage, {review:'#ffb547', debug:'#ff5c5a', verify:'#4ad9e4', test:'#22d19a'}[stage]);
+  }
+}
+
 // Enhancement 7: load inventory MCP + plugins + skills
 const activeMcps = new Set(); // Track MCPs được dùng từ tool calls mcp__<name>__
 function fmtAge(s) {
-  if (s < 60) return s + 's';
-  if (s < 3600) return Math.floor(s/60) + 'm';
-  return Math.floor(s/3600) + 'h' + Math.floor((s%3600)/60) + 'm';
+  // Format tiếng Việt giống Telegram: "vừa xong", "41p trước", "2g trước", "3ng trước"
+  if (s < 10) return 'vừa xong';
+  if (s < 60) return s + 's trước';
+  if (s < 3600) return Math.floor(s/60) + 'p trước';
+  if (s < 86400) return Math.floor(s/3600) + 'g trước';
+  return Math.floor(s/86400) + 'ng trước';
 }
 
 async function loadInventory() {
@@ -788,15 +984,16 @@ async function loadInventory() {
       document.getElementById('session-name').textContent = curSess.name;
       document.getElementById('sess-id').textContent = curSess.name;
     }
-    sessList.innerHTML = inv.sessions.items.map(s => {
+    sessList.innerHTML = inv.sessions.items.map((s, i) => {
         const cls = s.live ? 'live' : (s.recent ? 'recent' : 'idle');
-        const label = s.live ? 'LIVE' : (s.recent ? 'recent' : 'idle');
-        return `<div class="sess-row ${cls}" title="${s.id}">
-          <span class="sess-badge ${cls}">${label}</span>
-          <span class="sess-id">${s.name}</span>
-          <span class="sess-proj">${s.project.slice(0,36)}</span>
-          <span class="sess-meta">${s.size_mb} MB</span>
-          <span class="sess-meta">${fmtAge(s.age_s)} ago</span>
+        const icon = s.live ? 'ti ti-player-play-filled' : (s.recent ? 'ti ti-circle-dot-filled' : 'ti ti-circle');
+        const projShort = s.project.replace(/^D--Projects-/, '').slice(0, 24);
+        const pinned = state.pinnedSessionId === s.id ? ' pinned' : '';
+        return `<div class="sess-row ${cls}${pinned}" data-id="${s.id}" title="click để pin dashboard theo dõi · ${s.id}">
+          <span class="sess-num">${i + 1}.</span>
+          <i class="${icon} sess-icon ${cls}"></i>
+          <span class="sess-id">${s.name}<span class="project">${projShort}</span></span>
+          <span class="sess-meta">${fmtAge(s.age_s)}</span>
         </div>`;
       }).join('') +
       (inv.telegram.installed ? `<div class="sess-tg"><i class="ti ti-brand-telegram"></i><span>Telegram bot: <b style="color: var(--text-primary);">${inv.telegram.bot}</b> · gateway plugin installed · ${inv.telegram.note}</span></div>` : '');
@@ -825,6 +1022,37 @@ async function loadInventory() {
 loadInventory();
 // Refresh sessions + inventory mỗi 5s (lightweight)
 setInterval(loadInventory, 5000);
+
+// Click session row → pin dashboard theo dõi session đó
+document.addEventListener('click', async (e) => {
+  const row = e.target.closest('.sess-row[data-id]');
+  if (!row) return;
+  const sid = row.dataset.id;
+  const isPinned = state.pinnedSessionId === sid;
+  try {
+    const body = isPinned ? {clear: true} : {id: sid};
+    const r = await fetch('/api/pin-session', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const resp = await r.json();
+    if (resp.ok) {
+      state.pinnedSessionId = isPinned ? null : sid;
+      // Reset timeline + reload
+      document.getElementById('timeline').innerHTML = '';
+      state.kindTally = {};
+      recentEdits.length = 0;
+      pendingEdits.clear();
+      renderEdits();
+      // Flash notification
+      gsap.fromTo('.sess-row[data-id="' + sid + '"]',
+        {backgroundColor: 'rgba(255,132,81,0.4)'},
+        {backgroundColor: '', duration: 1, ease: 'power2.out'});
+      // Reload inventory + snapshot
+      setTimeout(() => { loadInventory(); loadSnapshot(); }, 800);
+    }
+  } catch (err) { console.error('pin session', err); }
+});
 
 // Pipeline: emit particles liên tục khi activeTools > 0 (dòng chảy)
 setInterval(() => {

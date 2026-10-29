@@ -12,6 +12,8 @@ class SessionState:
     def __init__(self, max_events: int = 200):
         self.session_file: str | None = None
         self.session_id: str | None = None
+        # Nếu set → watcher chỉ tail file này (user pin via dashboard click)
+        self.pinned_session_file: str | None = None
         self.started_at: float = time.time()
         self.events: deque[dict] = deque(maxlen=max_events)
         # Pending tool_use_id → tool_use event (match với tool_result sau)
@@ -76,6 +78,7 @@ class SessionState:
         return {
             "session_file": self.session_file,
             "session_id": self.session_id,
+            "pinned": self.pinned_session_file is not None,
             "started_at": self.started_at,
             "uptime_s": round(time.time() - self.started_at),
             "counters": dict(self.counters),
