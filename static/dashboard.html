@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="vi" data-mode="dark">
+<head>
+<meta charset="utf-8" />
+<title>Claude Live · Astra Pipeline</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css">
+<style>
+:root {
+  --bg: #0a0a0d;
+  --surface-0: #111115;
+  --surface-1: #16161c;
+  --surface-2: #1e1e26;
+  --surface-3: #2a2a35;
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text-primary: #ececec;
+  --text-secondary: #9b9ba3;
+  --text-muted: #6a6a73;
+  --accent: #4a9eff;
+  --accent-dim: rgba(74,158,255,0.12);
+  --green: #22d19a;
+  --amber: #ffb547;
+  --red: #ff5c5a;
+  --violet: #a287f4;
+  --orange: #ff8451;
+  --pink: #f58cb5;
+  --cyan: #4ad9e4;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); color: var(--text-primary); font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; line-height: 1.5; overflow-x: hidden; min-height: 100vh; }
+body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%, rgba(74,158,255,0.08), transparent 60%), radial-gradient(900px 500px at 90% 110%, rgba(162,135,244,0.06), transparent 60%), var(--bg); }
+.wrap { max-width: 1360px; margin: 0 auto; }
+.sr-only { position: absolute; left: -9999px; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 10px 16px; background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 14px; backdrop-filter: blur(10px); }
+.sess { display: flex; align-items: center; gap: 12px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(34,209,154,0.6); }
+.dot.red { background: var(--red); }
+.topbar-right { font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; display: flex; gap: 16px; align-items: center; }
+.topbar-right b { color: var(--text-primary); font-weight: 500; }
+
+.grid { display: grid; gap: 12px; }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.g2 { grid-template-columns: 1.3fr 1fr; }
+
+.card { background: linear-gradient(180deg, var(--surface-1), var(--surface-0)); border: 0.5px solid var(--border); border-radius: 14px; padding: 14px 16px; position: relative; overflow: hidden; }
+.card.hero { border-left: 2px solid var(--accent); padding-left: 18px; }
+.card-glow::before { content: ''; position: absolute; inset: -1px; border-radius: 14px; padding: 1px; background: linear-gradient(135deg, var(--accent), transparent 40%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0.4; }
+
+.lbl { font-size: 10px; color: var(--text-muted); text-transform: lowercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 500; }
+.val { font-size: 24px; font-weight: 500; font-feature-settings: 'tnum'; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; line-height: 1.1; }
+.val.sm { font-size: 16px; }
+.sub { font-size: 11px; color: var(--text-secondary); margin-top: 6px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+
+.current { background: var(--accent-dim); padding: 12px 14px; margin-top: 12px; border-radius: 10px; border: 0.5px solid rgba(74,158,255,0.3); position: relative; overflow: hidden; }
+.current::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(74,158,255,0.1), transparent); }
+.current.live::after { animation: sweep 2s ease-in-out infinite; }
+@keyframes sweep { 0% { left: -100%; } 100% { left: 100%; } }
+.current-name { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: var(--accent); }
+.current-cmd { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-secondary); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.tl { height: 340px; overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
+.tl::-webkit-scrollbar { width: 6px; }
+.tl::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+.tl-row { display: grid; grid-template-columns: 56px 16px auto 1fr; gap: 10px; align-items: center; padding: 5px 8px; margin-bottom: 2px; border-radius: 7px; font-size: 11px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; opacity: 0; transition: background 0.2s; }
+.tl-row:hover { background: var(--surface-2); }
+.tl-time { color: var(--text-muted); font-size: 10px; }
+.tl-icon { font-size: 14px; text-align: center; }
+.tl-bar { height: 16px; border-radius: 4px; min-width: 24px; display: flex; align-items: center; padding: 0 7px; color: #000; font-size: 9px; font-weight: 600; max-width: 160px; }
+.tl-bar.live { background: linear-gradient(90deg, var(--accent), var(--cyan)); background-size: 200% 100%; animation: liveShim 1.4s linear infinite; color: #fff; }
+@keyframes liveShim { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+.tl-label { color: var(--text-secondary); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-label b { color: var(--text-primary); font-weight: 500; }
+
+.tree { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 2; }
+.tree-node { display: flex; align-items: center; gap: 7px; }
+.tree-indent { color: var(--text-muted); white-space: pre; }
+.tree-status { padding: 1px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; margin-left: auto; }
+.tree-status.live { background: rgba(74,158,255,0.18); color: var(--accent); }
+.tree-status.done { background: rgba(34,209,154,0.15); color: var(--green); }
+.tree-status.err { background: rgba(255,92,90,0.15); color: var(--red); }
+
+.counter-grid .lbl { margin-bottom: 2px; }
+.counter-grid .val { font-size: 20px; }
+.counter-grid .card { background: var(--surface-1); }
+
+.kinds-bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.kinds-bar > div { height: 100%; }
+.kinds-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 10px; color: var(--text-secondary); }
+.kinds-legend span { display: flex; align-items: center; gap: 4px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+.kinds-legend .sw { width: 8px; height: 8px; border-radius: 2px; }
+
+.pipeline { background: linear-gradient(180deg, var(--surface-1), var(--surface-0)); border: 0.5px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-top: 12px; position: relative; overflow: hidden; }
+.pipeline svg { width: 100%; height: 220px; }
+.pipeline-head { display: flex; justify-content: space-between; margin-bottom: 10px; }
+
+.node-rect { fill: var(--surface-2); stroke-width: 1.5; }
+.node-rect.active { fill: var(--accent-dim); }
+.node-glow { filter: drop-shadow(0 0 8px currentColor); }
+.edge { fill: none; stroke-width: 2; stroke-linecap: round; }
+.particle { fill: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
+
+.footer { margin-top: 14px; padding: 10px 16px; background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 10px; font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; display: flex; justify-content: space-between; }
+.footer b { color: var(--text-primary); font-weight: 500; }
+
+.kind-tool_use { color: var(--accent); }
+.kind-tool_result { color: var(--green); }
+.kind-agent_spawn { color: var(--pink); }
+.kind-user_msg { color: var(--violet); }
+.kind-assistant_text { color: var(--text-secondary); }
+.kind-api_request { color: var(--amber); }
+.kind-system { color: var(--text-muted); }
+
+/* Phase 7 enhancements */
+.tl-row.aging { opacity: 0.45; transition: opacity 0.6s; }
+.tl-row.aging-more { opacity: 0.25; transition: opacity 0.6s; }
+.tl-row.tool-err { background: rgba(255,92,90,0.1); border-left: 2px solid var(--red); padding-left: 6px; }
+
+.node-rect.sustained { animation: nodeSustain 1.4s ease-in-out infinite; }
+@keyframes nodeSustain {
+  0%, 100% { stroke-width: 1.5; filter: none; }
+  50% { stroke-width: 2.5; filter: drop-shadow(0 0 6px currentColor); }
+}
+
+.tree-node.has-children { cursor: pointer; user-select: none; }
+.tree-node.has-children::before { content: '▸'; display: inline-block; color: var(--text-muted); font-size: 10px; margin-right: 2px; transition: transform 0.2s; }
+.tree-node.has-children.open::before { transform: rotate(90deg); }
+.tree-children { padding-left: 14px; overflow: hidden; }
+.tree-children.collapsed { display: none; }
+
+.loops-section { margin-top: 14px; padding-top: 14px; border-top: 0.5px solid var(--border); }
+.loop-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.loop-ring { width: 36px; height: 36px; position: relative; flex-shrink: 0; }
+.loop-ring svg { transform: rotate(-90deg); }
+.loop-ring circle { fill: none; stroke-width: 3; }
+.loop-ring .bg { stroke: var(--surface-3); }
+.loop-ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.8s ease-out; }
+.loop-ring-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: var(--text-primary); }
+.loop-name { flex: 1; color: var(--text-primary); }
+.loop-meta { color: var(--text-secondary); font-size: 10px; }
+
+.ctx-wrap { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.ctx-bar { height: 4px; background: var(--surface-3); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.ctx-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--amber), var(--red)); border-radius: 2px; transition: width 0.6s ease-out; width: 0%; }
+.ctx-head { display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); }
+.ctx-head b { color: var(--text-primary); font-weight: 500; }
+</style>
+</head>
+<body>
+<h2 class="sr-only">Claude live dashboard — realtime pipeline giám sát agent, tool calls, flow.</h2>
+<div class="wrap">
+
+<div class="topbar">
+  <div class="sess">
+    <span class="dot" id="conn-dot"></span>
+    <span id="conn-text">kết nối SSE…</span>
+    <span style="color: var(--text-muted);">·</span>
+    <span id="sess-id" style="color: var(--text-primary);">—</span>
+  </div>
+  <div class="topbar-right">
+    <span><b id="uptime">00:00:00</b> uptime</span>
+    <span><b id="ev-rate">0</b> ev/s</span>
+    <span><b id="active-tools">0</b> active</span>
+  </div>
+</div>
+
+<div class="card hero card-glow" style="margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+    <div>
+      <div class="lbl">session đang xử lý</div>
+      <div class="val" style="color: var(--accent);">
+        <span class="dot" style="display: inline-block; margin-right: 10px; vertical-align: 3px; box-shadow: 0 0 12px rgba(34,209,154,0.6);"></span><span id="session-name">—</span>
+      </div>
+      <div class="sub" id="session-sub">—</div>
+    </div>
+    <div style="display: flex; gap: 28px;">
+      <div><div class="lbl">events total</div><div class="val" id="ev-total">0</div></div>
+      <div><div class="lbl">tool calls</div><div class="val" id="ev-tools">0</div></div>
+    </div>
+  </div>
+  <div class="current" id="current" style="display: none;">
+    <div><span class="current-name" id="current-name">—</span></div>
+    <div class="current-cmd" id="current-cmd">—</div>
+  </div>
+</div>
+
+<div class="grid g4 counter-grid" style="margin-bottom: 12px;">
+  <div class="card"><div class="lbl">agent spawns</div><div class="val" id="c-agents">0</div><div class="sub">subagents created</div></div>
+  <div class="card"><div class="lbl">assistant turns</div><div class="val" id="c-turns">0</div><div class="sub">text responses</div></div>
+  <div class="card"><div class="lbl">user msgs</div><div class="val" id="c-user">0</div><div class="sub">prompts sent</div></div>
+  <div class="card"><div class="lbl">errors</div><div class="val" id="c-err" style="color: var(--red);">0</div><div class="sub">tool failures</div></div>
+</div>
+
+<div class="grid g2" style="margin-bottom: 12px;">
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="lbl">timeline · last 60 events</div>
+      <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">auto scroll</div>
+    </div>
+    <div class="tl" id="timeline"></div>
+  </div>
+  <div class="card">
+    <div class="lbl">agent tree · spawn hierarchy</div>
+    <div class="tree" id="tree">
+      <div class="tree-node"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;">main session</span><span class="tree-status live">active</span></div>
+      <div id="tree-children"></div>
+    </div>
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 0.5px solid var(--border);">
+      <div class="lbl">event kinds breakdown</div>
+      <div class="kinds-bar" id="kinds-bar"></div>
+      <div class="kinds-legend" id="kinds-legend"></div>
+    </div>
+    <div class="loops-section">
+      <div class="lbl">loops · lifecycle</div>
+      <div id="loops-list">
+        <div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>
+      </div>
+    </div>
+    <div class="ctx-wrap">
+      <div class="ctx-head"><span>context tokens</span><span><b id="ctx-used">0</b> / <span id="ctx-max">200k</span></span></div>
+      <div class="ctx-bar"><div class="ctx-bar-fill" id="ctx-fill"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <div class="lbl">inventory · mcp + plugins + skills</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="inv-counts">—</div>
+  </div>
+  <div class="grid" style="grid-template-columns: 1fr 1fr 2fr; gap: 12px;">
+    <div class="inv-col">
+      <div style="font-size: 11px; font-weight: 500; color: var(--accent); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-plug tl-icon"></i> MCP servers</span><span id="inv-mcp-n" style="color: var(--text-muted);">0</span></div>
+      <div id="inv-mcps" class="inv-list"></div>
+    </div>
+    <div class="inv-col">
+      <div style="font-size: 11px; font-weight: 500; color: var(--violet); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-puzzle tl-icon"></i> Plugins</span><span id="inv-plug-n" style="color: var(--text-muted);">0</span></div>
+      <div id="inv-plugins" class="inv-list"></div>
+    </div>
+    <div class="inv-col">
+      <div style="font-size: 11px; font-weight: 500; color: var(--amber); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-sparkles tl-icon"></i> Skills</span><span id="inv-skill-n" style="color: var(--text-muted);">0</span></div>
+      <div id="inv-skills" class="inv-list" style="max-height: 120px; overflow-y: auto;"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+.inv-list { font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 1.8; color: var(--text-secondary); }
+.inv-item { padding: 2px 6px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; gap: 6px; transition: background 0.15s; }
+.inv-item:hover { background: var(--surface-2); color: var(--text-primary); }
+.inv-item .meta { color: var(--text-muted); font-size: 9px; }
+.inv-item .pulse { width: 5px; height: 5px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.inv-item .pulse.active { animation: pulse 1.5s ease-in-out infinite; box-shadow: 0 0 4px rgba(34,209,154,0.6); }
+.inv-list::-webkit-scrollbar { width: 4px; }
+.inv-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+
+<div class="pipeline">
+  <div class="pipeline-head">
+    <div class="lbl">pipeline · live flow</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="pipe-info">waiting for events…</div>
+  </div>
+  <svg id="pipeline-svg" viewBox="0 0 1280 220" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9b9ba3"/></marker>
+      <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#4a9eff" stop-opacity="0.1"/>
+        <stop offset="50%" stop-color="#4a9eff" stop-opacity="1"/>
+        <stop offset="100%" stop-color="#22d19a" stop-opacity="0.1"/>
+      </linearGradient>
+    </defs>
+    <g font-family="'JetBrains Mono', monospace" font-size="12" fill="#ececec">
+      <!-- Node: ba -->
+      <g id="node-user" transform="translate(60, 110)">
+        <circle r="34" class="node-rect" stroke="#4a9eff"/>
+        <text y="-2" text-anchor="middle" font-weight="500">ba</text>
+        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3">user</text>
+      </g>
+      <!-- Node: claude -->
+      <g id="node-claude" transform="translate(250, 110)">
+        <rect x="-70" y="-32" width="140" height="64" rx="12" class="node-rect active" stroke="#4a9eff"/>
+        <text y="-6" text-anchor="middle" font-weight="500" fill="#4a9eff">claude main</text>
+        <text y="12" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-claude-sub">harness</text>
+        <text y="26" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-claude-turns">0 turns</text>
+      </g>
+      <!-- Node: tool bus -->
+      <g id="node-tool" transform="translate(500, 110)">
+        <rect x="-80" y="-32" width="160" height="64" rx="12" class="node-rect" stroke="#4a9eff"/>
+        <text y="-6" text-anchor="middle" font-weight="500" fill="#4a9eff" id="n-tool-name">tool bus</text>
+        <text y="12" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-tool-sub">idle</text>
+        <text y="26" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-tool-count">0 calls</text>
+      </g>
+      <!-- Node: agent spawn -->
+      <g id="node-agent" transform="translate(760, 50)">
+        <rect x="-70" y="-24" width="140" height="48" rx="10" class="node-rect" stroke="#f58cb5"/>
+        <text y="-2" text-anchor="middle" font-size="11" fill="#f58cb5">subagents</text>
+        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-agent-count">0 spawned</text>
+      </g>
+      <!-- Node: bg tasks -->
+      <g id="node-bg" transform="translate(760, 170)">
+        <rect x="-70" y="-24" width="140" height="48" rx="10" class="node-rect" stroke="#ffb547"/>
+        <text y="-2" text-anchor="middle" font-size="11" fill="#ffb547">background</text>
+        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-bg-count">0 running</text>
+      </g>
+      <!-- Node: result -->
+      <g id="node-result" transform="translate(1000, 110)">
+        <rect x="-70" y="-32" width="140" height="64" rx="12" class="node-rect" stroke="#22d19a"/>
+        <text y="-6" text-anchor="middle" font-weight="500" fill="#22d19a">result</text>
+        <text y="12" text-anchor="middle" font-size="9" fill="#9b9ba3" id="n-result-sub">pending</text>
+        <text y="26" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-result-count">0 ok</text>
+      </g>
+      <!-- Node: back to ba -->
+      <g id="node-user2" transform="translate(1210, 110)">
+        <circle r="34" class="node-rect" stroke="#22d19a"/>
+        <text y="-2" text-anchor="middle" font-weight="500">ba</text>
+        <text y="14" text-anchor="middle" font-size="9" fill="#9b9ba3">answer</text>
+      </g>
+
+      <!-- Edges -->
+      <path id="edge-u-c" d="M94,110 L180,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+      <path id="edge-c-t" d="M320,110 L420,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+      <path id="edge-t-a" d="M580,100 Q670,100 690,70" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+      <path id="edge-t-b" d="M580,120 Q670,120 690,160" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+      <path id="edge-t-r" d="M580,110 L930,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+      <path id="edge-r-u" d="M1070,110 L1176,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+
+      <!-- Particles layer -->
+      <g id="particles"></g>
+    </g>
+  </svg>
+</div>
+
+<div class="footer">
+  <div><i class="ti ti-circle-filled" style="font-size: 7px; color: var(--green);"></i> tail jsonl @ <span id="rate"><b>0</b></span> ev/s</div>
+  <div>last: <b id="last-ev">—</b> · total: <b id="total-events">0</b> events</div>
+  <div>astra · build v2 · <b>gsap animated</b></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+const TOOL_ICONS = {
+  Bash: 'ti-terminal-2', Read: 'ti-file-text', Write: 'ti-pencil', Edit: 'ti-edit',
+  Grep: 'ti-search', Glob: 'ti-files', Agent: 'ti-users', WebFetch: 'ti-world',
+  WebSearch: 'ti-world-search', Task: 'ti-checkbox', ToolSearch: 'ti-search',
+  ScheduleWakeup: 'ti-alarm', Skill: 'ti-sparkles',
+};
+const TOOL_COLOR = {
+  Bash: '#4a9eff', Read: '#a287f4', Write: '#ff8451', Edit: '#ff8451',
+  Grep: '#22d19a', Glob: '#22d19a', Agent: '#f58cb5',
+  Task: '#ffb547', Skill: '#a287f4', WebFetch: '#4ad9e4',
+};
+const KIND_COLORS = {
+  tool_use: '#4a9eff', tool_result: '#22d19a', agent_spawn: '#f58cb5',
+  user_msg: '#a287f4', assistant_text: '#9b9ba3', api_request: '#ffb547',
+  system: '#6a6a73', unknown: '#6a6a73',
+};
+const KIND_LABEL = {
+  tool_use: 'tool', tool_result: 'result', agent_spawn: 'agent',
+  user_msg: 'user', assistant_text: 'text', api_request: 'api', system: 'sys',
+};
+
+let state = { counters: {}, startedAt: Date.now() / 1000, kindTally: {}, ctxTokens: 0, ctxMax: 200000, loops: [] };
+let evTimes = [];
+let activeTools = 0;
+
+function ageTimelineRows() {
+  const rows = document.querySelectorAll('.tl-row');
+  const total = rows.length;
+  rows.forEach((row, i) => {
+    const age = total - i;
+    row.classList.remove('aging', 'aging-more');
+    if (age > 40) row.classList.add('aging-more');
+    else if (age > 20) row.classList.add('aging');
+  });
+}
+
+function sustainToolNode(on) {
+  const node = document.querySelector('#node-tool .node-rect');
+  if (!node) return;
+  if (on) {
+    node.classList.add('sustained');
+    node.style.color = 'var(--accent)';
+  } else {
+    node.classList.remove('sustained');
+  }
+}
+
+function updateContextTokens(used, max) {
+  state.ctxTokens = used;
+  if (max) state.ctxMax = max;
+  const pct = Math.min(100, (used / state.ctxMax) * 100);
+  document.getElementById('ctx-used').textContent = used >= 1000 ? (used/1000).toFixed(1) + 'k' : used;
+  document.getElementById('ctx-max').textContent = (state.ctxMax/1000).toFixed(0) + 'k';
+  document.getElementById('ctx-fill').style.width = pct + '%';
+}
+
+function renderLoops(loops) {
+  const el = document.getElementById('loops-list');
+  if (!loops || loops.length === 0) {
+    el.innerHTML = '<div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>';
+    return;
+  }
+  el.innerHTML = loops.map(l => {
+    const circ = 2 * Math.PI * 15;
+    const offset = circ * (1 - l.progress);
+    return `<div class="loop-row">
+      <div class="loop-ring">
+        <svg width="36" height="36"><circle class="bg" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" style="stroke-dasharray: ${circ}; stroke-dashoffset: ${offset};"/></svg>
+        <div class="loop-ring-text">${Math.round(l.progress*100)}%</div>
+      </div>
+      <div class="loop-name">${l.name}<div class="loop-meta">iter ${l.iter || 1} · next ${l.nextIn}s</div></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleTreeChildren(evt) {
+  const node = evt.currentTarget;
+  node.classList.toggle('open');
+  const next = node.nextElementSibling;
+  if (next && next.classList.contains('tree-children')) {
+    next.classList.toggle('collapsed');
+    gsap.fromTo(next, { height: next.classList.contains('collapsed') ? next.scrollHeight : 0 },
+      { height: next.classList.contains('collapsed') ? 0 : next.scrollHeight, duration: 0.3, ease: 'power2.inOut',
+        onComplete: () => { if (!next.classList.contains('collapsed')) next.style.height = 'auto'; } });
+  }
+}
+
+gsap.defaults({ duration: 0.5, ease: 'power2.out' });
+
+// Hero dot glow pulse
+gsap.to('.dot', { boxShadow: '0 0 0 8px rgba(34,209,154,0)', duration: 1.5, repeat: -1, ease: 'power2.out' });
+
+function fmtTime(s) {
+  const h = String(Math.floor(s/3600)).padStart(2,'0');
+  const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+  const sec = String(Math.floor(s%60)).padStart(2,'0');
+  return h+':'+m+':'+sec;
+}
+function fmtClock(ts) {
+  const d = new Date(ts*1000);
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+
+function animCounter(elId, to) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const from = parseInt(el.textContent) || 0;
+  if (from === to) return;
+  const obj = { v: from };
+  gsap.to(obj, {
+    v: to, duration: 0.6, ease: 'power2.out',
+    onUpdate: () => el.textContent = Math.round(obj.v),
+  });
+  gsap.fromTo(el, { color: 'var(--accent)' }, { color: '', duration: 0.8 });
+}
+
+function updateCounters(c, ctx) {
+  const total = (c.tool_calls || 0) + (c.assistant_turns || 0) + (c.user_msgs || 0) + (c.agents_spawned || 0);
+  animCounter('ev-total', total);
+  animCounter('ev-tools', c.tool_calls || 0);
+  animCounter('c-agents', c.agents_spawned || 0);
+  animCounter('c-turns', c.assistant_turns || 0);
+  animCounter('c-user', c.user_msgs || 0);
+  animCounter('c-err', c.errors || 0);
+  animCounter('total-events', total);
+  // Real context tokens từ Claude API usage
+  if (ctx && ctx.tokens) {
+    updateContextTokens(ctx.tokens, ctx.max_tokens || 200000);
+  }
+  // Update pipeline node counters
+  document.getElementById('n-claude-turns').textContent = (c.assistant_turns || 0) + ' turns';
+  document.getElementById('n-tool-count').textContent = (c.tool_calls || 0) + ' calls';
+  document.getElementById('n-agent-count').textContent = (c.agents_spawned || 0) + ' spawned';
+  document.getElementById('n-result-count').textContent = ((c.tool_calls || 0) - (c.errors || 0)) + ' ok';
+  state.counters = c;
+}
+
+function renderKinds() {
+  const total = Object.values(state.kindTally).reduce((a,b) => a+b, 0);
+  if (total === 0) return;
+  const bar = document.getElementById('kinds-bar');
+  const leg = document.getElementById('kinds-legend');
+  bar.innerHTML = '';
+  leg.innerHTML = '';
+  const sorted = Object.entries(state.kindTally).sort((a,b) => b[1] - a[1]);
+  for (const [kind, n] of sorted) {
+    const pct = (n / total * 100).toFixed(1);
+    const seg = document.createElement('div');
+    seg.style.cssText = `background: ${KIND_COLORS[kind] || '#6a6a73'}; flex: ${n}; min-width: 2px;`;
+    bar.appendChild(seg);
+    const lg = document.createElement('span');
+    lg.innerHTML = `<span class="sw" style="background: ${KIND_COLORS[kind] || '#6a6a73'};"></span>${KIND_LABEL[kind] || kind} <span style="color: var(--text-muted);">${n}</span>`;
+    leg.appendChild(lg);
+  }
+  // Animate bar in
+  gsap.from('#kinds-bar > div', { scaleX: 0, transformOrigin: 'left', duration: 0.5, stagger: 0.03, ease: 'power3.out' });
+}
+
+function emitParticle(edgeId, color) {
+  const svg = document.getElementById('pipeline-svg');
+  const path = document.getElementById(edgeId);
+  if (!path || !svg) return;
+  const particles = document.getElementById('particles');
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  dot.setAttribute('r', '4');
+  dot.setAttribute('fill', color || '#4a9eff');
+  dot.setAttribute('filter', 'drop-shadow(0 0 6px ' + (color || '#4a9eff') + ')');
+  particles.appendChild(dot);
+  const len = path.getTotalLength();
+  const obj = { d: 0 };
+  gsap.to(obj, {
+    d: len, duration: 0.9, ease: 'power1.inOut',
+    onUpdate: () => {
+      const p = path.getPointAtLength(obj.d);
+      dot.setAttribute('cx', p.x);
+      dot.setAttribute('cy', p.y);
+    },
+    onComplete: () => dot.remove(),
+  });
+  // Pulse edge
+  gsap.fromTo(path, { stroke: color || '#4a9eff', strokeWidth: 3 }, { stroke: '#4a4a55', strokeWidth: 2, duration: 1.2, ease: 'power2.out' });
+}
+
+function pulseNode(nodeId, color) {
+  const node = document.querySelector(`#${nodeId} .node-rect`);
+  if (!node) return;
+  gsap.fromTo(node,
+    { stroke: color, strokeWidth: 3 },
+    { strokeWidth: 1.5, duration: 1, ease: 'power2.out' }
+  );
+}
+
+function renderEvent(ev) {
+  // Count kind
+  state.kindTally[ev.kind] = (state.kindTally[ev.kind] || 0) + 1;
+
+  const tl = document.getElementById('timeline');
+  const row = document.createElement('div');
+  row.className = 'tl-row';
+  const icon = TOOL_ICONS[ev.name] || 'ti-circle-dot';
+  const color = TOOL_COLOR[ev.name] || KIND_COLORS[ev.kind] || '#9b9ba3';
+  const label = ev.name || KIND_LABEL[ev.kind] || ev.kind;
+  const summary = ev.payload?.summary ? ' · ' + ev.payload.summary.slice(0, 60) : (ev.payload?.chars ? ` · ${ev.payload.chars}c` : '');
+  const barW = Math.min(140, Math.max(24, (ev.duration || 1) * 14));
+  const barText = ev.duration != null ? ev.duration.toFixed(1) + 's' : '…';
+  const isLive = ev.status === 'running';
+  row.innerHTML = `
+    <span class="tl-time">${fmtClock(ev.ts)}</span>
+    <i class="ti ${icon} tl-icon" style="color: ${color};"></i>
+    <div class="tl-bar ${isLive ? 'live' : ''}" style="background: ${isLive ? '' : color}; width: ${barW}px;">${barText}</div>
+    <span class="tl-label kind-${ev.kind}"><b>${label}</b>${summary}</span>
+  `;
+  // Error state red pulse — enhancement 6
+  if (ev.status === 'error') row.classList.add('tool-err');
+
+  tl.appendChild(row);
+  while (tl.children.length > 60) tl.removeChild(tl.firstChild);
+
+  // GSAP enter animation
+  gsap.fromTo(row,
+    { opacity: 0, x: -20 },
+    { opacity: 1, x: 0, duration: 0.4, ease: 'back.out(1.4)' }
+  );
+  if (ev.status === 'error') {
+    gsap.fromTo(row, { backgroundColor: 'rgba(255,92,90,0.35)' },
+      { backgroundColor: 'rgba(255,92,90,0.1)', duration: 1.2, ease: 'power2.out' });
+  }
+  tl.scrollTop = tl.scrollHeight;
+  // Enhancement 1: age older rows (fade out)
+  ageTimelineRows();
+
+  // Pipeline reactions
+  if (ev.kind === 'tool_use') {
+    activeTools++;
+    document.getElementById('active-tools').textContent = activeTools;
+    document.getElementById('current').style.display = 'block';
+    document.getElementById('current').classList.add('live');
+    document.getElementById('current-name').textContent = ev.name + ' — running';
+    document.getElementById('current-cmd').textContent = ev.payload?.summary || '';
+    document.getElementById('n-tool-name').textContent = ev.name;
+    document.getElementById('n-tool-sub').textContent = 'running';
+    document.getElementById('pipe-info').textContent = `→ ${ev.name} (${ev.payload?.summary?.slice(0,40) || ''})`;
+    emitParticle('edge-c-t', color);
+    pulseNode('node-tool', color);
+    sustainToolNode(true);  // enhancement 2: sustained glow khi tool chạy
+    gsap.fromTo('.current', { backgroundColor: 'rgba(74,158,255,0.3)' }, { backgroundColor: 'rgba(74,158,255,0.12)', duration: 1, ease: 'power2.out' });
+    if (ev.name === 'Agent') emitParticle('edge-t-a', '#f58cb5');
+  }
+  if (ev.kind === 'tool_result') {
+    activeTools = Math.max(0, activeTools - 1);
+    document.getElementById('active-tools').textContent = activeTools;
+    if (activeTools === 0) {
+      document.getElementById('current').classList.remove('live');
+      sustainToolNode(false);  // enhancement 2: stop sustained glow
+      setTimeout(() => { if (activeTools === 0) document.getElementById('current').style.display = 'none'; }, 500);
+    }
+    document.getElementById('n-tool-sub').textContent = ev.status === 'error' ? 'error' : 'done';
+    document.getElementById('n-result-sub').textContent = ev.duration ? ev.duration.toFixed(1) + 's' : 'ok';
+    emitParticle('edge-t-r', ev.status === 'error' ? '#ff5c5a' : '#22d19a');
+    emitParticle('edge-r-u', '#22d19a');
+    pulseNode('node-result', ev.status === 'error' ? '#ff5c5a' : '#22d19a');
+  }
+  if (ev.kind === 'user_msg') {
+    emitParticle('edge-u-c', '#a287f4');
+    pulseNode('node-claude', '#a287f4');
+  }
+  if (ev.kind === 'agent_spawn') {
+    const tc = document.getElementById('tree-children');
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+    node.innerHTML = `<span class="tree-indent">├─ </span><i class="ti ti-git-fork tl-icon" style="color: var(--pink);"></i><span>${ev.name}</span><span class="tree-status live">running</span>`;
+    tc.appendChild(node);
+    gsap.from(node, { opacity: 0, x: -10, duration: 0.4, ease: 'back.out(1.5)' });
+    emitParticle('edge-t-a', '#f58cb5');
+    pulseNode('node-agent', '#f58cb5');
+  }
+
+  // Rate tracking
+  const now = Date.now();
+  evTimes.push(now);
+  evTimes = evTimes.filter(t => t > now - 5000);
+  const rate = (evTimes.length / 5).toFixed(1);
+  document.getElementById('ev-rate').textContent = rate;
+  document.getElementById('rate').innerHTML = `<b>${rate}</b>`;
+  document.getElementById('last-ev').textContent = fmtClock(ev.ts);
+
+  renderKinds();
+}
+
+async function loadSnapshot() {
+  try {
+    const r = await fetch('/api/snapshot');
+    const s = await r.json();
+    document.getElementById('session-name').textContent = s.session_id ? s.session_id.slice(0, 8) : '—';
+    document.getElementById('session-sub').textContent = s.session_file ? s.session_file.split(/[\\/]/).pop() : '—';
+    document.getElementById('sess-id').textContent = s.session_id ? s.session_id.slice(0, 8) : '—';
+    state.startedAt = s.started_at;
+    state.lastSessionId = s.session_id;
+    updateCounters(s.counters, s.context);
+    document.getElementById('timeline').innerHTML = '';
+    state.kindTally = {};
+    s.events.slice(-50).forEach(renderEvent);
+  } catch (e) { console.error(e); }
+}
+
+let reconnectAttempts = 0;
+function connect() {
+  const es = new EventSource('/api/events');
+  es.addEventListener('open', () => {
+    document.getElementById('conn-dot').className = 'dot';
+    document.getElementById('conn-text').textContent = 'kết nối SSE OK';
+    gsap.to('#conn-dot', { boxShadow: '0 0 10px rgba(34,209,154,0.8)', duration: 0.3 });
+    reconnectAttempts = 0;
+  });
+  es.addEventListener('event', (e) => {
+    try {
+      const ev = JSON.parse(e.data);
+      renderEvent(ev);
+      updateCounters(state.counters, state.context);
+    } catch (err) { console.error(err); }
+  });
+  es.addEventListener('snapshot', (e) => {
+    try { renderEvent(JSON.parse(e.data)); } catch (err) {}
+  });
+  es.addEventListener('error', () => {
+    document.getElementById('conn-dot').className = 'dot red';
+    document.getElementById('conn-text').textContent = 'mất kết nối — reconnect…';
+    es.close();
+    // Exponential backoff: 1s, 2s, 4s, 8s, max 15s
+    const delay = Math.min(15000, 1000 * Math.pow(2, reconnectAttempts++));
+    setTimeout(() => connect(), delay);
+  });
+  // Periodic snapshot refresh (counters + context + detect session switch)
+  const refreshTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/snapshot');
+      const s = await r.json();
+      state.counters = s.counters;
+      state.context = s.context;
+      updateCounters(s.counters, s.context);
+      // Session switch detect
+      if (state.lastSessionId && s.session_id !== state.lastSessionId) {
+        document.getElementById('session-name').textContent = s.session_id.slice(0, 8);
+        document.getElementById('sess-id').textContent = s.session_id.slice(0, 8);
+        document.getElementById('timeline').innerHTML = '';
+        state.lastSessionId = s.session_id;
+        state.kindTally = {};
+        gsap.fromTo('.card', { opacity: 0.3 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+      }
+    } catch (e) { clearInterval(refreshTimer); }
+  }, 3000);
+}
+
+setInterval(() => {
+  document.getElementById('uptime').textContent = fmtTime(Date.now()/1000 - state.startedAt);
+  if (Date.now() - (evTimes.at(-1) || 0) > 5000) {
+    evTimes = [];
+    document.getElementById('ev-rate').textContent = '0';
+    document.getElementById('rate').innerHTML = '<b>0</b>';
+  }
+}, 1000);
+
+// Initial pipeline animation
+gsap.from('.card', { opacity: 0, y: 20, duration: 0.6, stagger: 0.08, ease: 'power3.out' });
+gsap.from('.pipeline', { opacity: 0, y: 20, duration: 0.8, delay: 0.3, ease: 'power3.out' });
+gsap.from('#pipeline-svg g[id^="node"]', { opacity: 0, y: 20, duration: 0.6, stagger: 0.08, delay: 0.3, ease: 'back.out(1.4)' });
+gsap.from('#pipeline-svg .edge', { opacity: 0, duration: 0.8, stagger: 0.1, delay: 0.6, ease: 'power2.out' });
+
+// Enhancement 7: load inventory MCP + plugins + skills
+const activeMcps = new Set(); // Track MCPs được dùng từ tool calls mcp__<name>__
+async function loadInventory() {
+  try {
+    const r = await fetch('/api/inventory');
+    const inv = await r.json();
+    document.getElementById('inv-counts').textContent = `${inv.mcps.count} MCP · ${inv.plugins.count} plugin · ${inv.skills.count} skill`;
+    document.getElementById('inv-mcp-n').textContent = inv.mcps.count;
+    document.getElementById('inv-plug-n').textContent = inv.plugins.count;
+    document.getElementById('inv-skill-n').textContent = inv.skills.count;
+    // Render MCP list
+    document.getElementById('inv-mcps').innerHTML = inv.mcps.items.map(m =>
+      `<div class="inv-item" data-mcp="${m.name}"><span><span class="pulse"></span> ${m.name}</span><span class="meta">${m.kind}</span></div>`
+    ).join('') || '<div style="color: var(--text-muted);">(empty)</div>';
+    // Render plugins
+    const pluginsHtml = inv.plugins.items.map(p =>
+      `<div class="inv-item"><span>${p.name}</span><span class="meta">${p.version || ''}</span></div>`
+    ).join('');
+    document.getElementById('inv-plugins').innerHTML = pluginsHtml || '<div style="color: var(--text-muted);">(none installed)</div>';
+    // Render skills
+    document.getElementById('inv-skills').innerHTML = inv.skills.items.map(s =>
+      `<div class="inv-item" title="${(s.description || '').replace(/"/g, '&quot;')}"><span>${s.name}</span><span class="meta">${s.source || ''}</span></div>`
+    ).join('');
+    // Stagger enter
+    gsap.from('.inv-item', { opacity: 0, x: -8, duration: 0.3, stagger: 0.01, ease: 'power2.out' });
+  } catch (e) { console.error('inventory', e); }
+}
+loadInventory();
+
+// Highlight MCP khi dùng — hook vào renderEvent
+const origRender = renderEvent;
+renderEvent = function(ev) {
+  origRender(ev);
+  if (ev.kind === 'tool_use' && ev.name && ev.name.startsWith('mcp__')) {
+    const mcpName = ev.name.split('__')[1];
+    activeMcps.add(mcpName);
+    const el = document.querySelector(`[data-mcp="${mcpName}"] .pulse`);
+    if (el) {
+      el.classList.add('active');
+      setTimeout(() => el.classList.remove('active'), 3000);
+    }
+  }
+};
+
+loadSnapshot().then(connect);
+
+// Enhancement 4: tree collapse/expand
+setTimeout(() => {
+  const mainNode = document.querySelector('.tree > .tree-node');
+  if (mainNode) {
+    mainNode.classList.add('has-children', 'open');
+    // Wrap existing children
+    const children = document.getElementById('tree-children');
+    children.className = 'tree-children';
+    mainNode.addEventListener('click', toggleTreeChildren);
+  }
+}, 500);
+
+// Enhancement 5: loop lifecycle demo — track uvicorn tail loop (6s window)
+let loopTick = 0;
+const LOOP_PERIOD = 10;
+setInterval(() => {
+  loopTick = (loopTick + 1) % LOOP_PERIOD;
+  renderLoops([{
+    name: 'uvicorn jsonl tail',
+    progress: loopTick / LOOP_PERIOD,
+    iter: Math.floor((Date.now() - state.startedAt * 1000) / (LOOP_PERIOD * 1000)) + 1,
+    nextIn: LOOP_PERIOD - loopTick,
+  }]);
+}, 1000);
+
+// Enhancement 3: context tokens — real values từ /api/snapshot (updated trong refreshTimer)
+// Fallback nếu chưa có usage từ snapshot: heuristic estimate
+setInterval(() => {
+  if (!state.context || !state.context.tokens) {
+    const c = state.counters || {};
+    const est = (c.tool_calls || 0) * 1500 + (c.assistant_turns || 0) * 2500 + (c.user_msgs || 0) * 300;
+    updateContextTokens(est, 200000);
+  }
+}, 2000);
+</script>
+</body>
+</html>
