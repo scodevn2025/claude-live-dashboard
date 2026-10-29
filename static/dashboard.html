@@ -1334,13 +1334,35 @@ document.addEventListener('click', async (e) => {
   } catch (err) { console.error('pin session', err); }
 });
 
-// Pipeline: emit particles liên tục khi activeTools > 0 (dòng chảy)
+// Full pipeline flow — particles chạy TUẦN TỰ qua chuỗi edges để visual flow đầy đủ
+function emitFullFlow() {
+  // ba → claude → thinking → tool → review → debug → verify → test → ba
+  const sequence = [
+    ['edge-u-c', '#4a9eff', 0],       // ba → claude
+    ['edge-c-think', '#a287f4', 180], // claude → thinking
+    ['edge-think-t', '#4a9eff', 360], // thinking → tool
+    ['edge-t-review', '#ffb547', 540],  // tool → review
+    ['edge-review-debug', '#ff5c5a', 720], // review → debug
+    ['edge-debug-verify', '#4ad9e4', 900], // debug → verify
+    ['edge-verify-test', '#22d19a', 1080], // verify → test
+    ['edge-test-r', '#22d19a', 1260],      // test → ba (result)
+  ];
+  sequence.forEach(([edge, color, delay]) => {
+    setTimeout(() => emitParticle(edge, color), delay);
+  });
+}
+
+// Background flow luôn chạy (không cần event trigger) — mỗi 2.5s 1 chuỗi
+setInterval(emitFullFlow, 2500);
+
+// Khi tool active → thêm chuỗi riêng cho feedback nhanh
 setInterval(() => {
   if (activeTools > 0) {
     emitParticle('edge-c-t', '#4a9eff');
     emitParticle('edge-t-r', '#22d19a');
+    emitParticle('edge-t-a', '#f58cb5');
   }
-}, 700);
+}, 800);
 
 // Highlight MCP khi dùng — hook vào renderEvent
 const origRender = renderEvent;

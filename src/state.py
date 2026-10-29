@@ -48,6 +48,13 @@ class SessionState:
         kind = event["kind"]
         self.events.append(event)
 
+        # Prune stale pending_tools (bug #7: memory leak) — keep 500 newest
+        if len(self.pending_tools) > 500:
+            # Drop oldest by started_at
+            sorted_ids = sorted(self.pending_tools.items(), key=lambda x: x[1].get("ts", 0))
+            for tid, _ in sorted_ids[:len(self.pending_tools) - 500]:
+                self.pending_tools.pop(tid, None)
+
         if kind == "tool_use":
             self.counters["tool_calls"] += 1
             tid = event["payload"].get("tool_use_id")
@@ -56,8 +63,9 @@ class SessionState:
             name = event.get("name", "")
             self.tool_tally[name] = self.tool_tally.get(name, 0) + 1
             p = event.get("payload") or {}
-            # Agent spawn → subagent
+            # Agent spawn → subagent + counter (bug #5)
             if name == "Agent":
+                self.counters["agents_spawned"] += 1
                 self.subagents.append({
                     "id": tid or event.get("id"),
                     "name": p.get("agent_name") or p.get("summary", "")[:30],
@@ -102,17 +110,19 @@ class SessionState:
                 self.counters["errors"] += 1
         elif kind == "assistant_text":
             self.counters["assistant_turns"] += 1
-            # Capture context tokens từ usage của assistant turn mới nhất
-            usage = event.get("payload", {}).get("usage") or {}
-            if usage:
-                self.context["tokens"] = usage.get("context", 0)
-                self.context["input"] = usage.get("input", 0)
-                self.context["cache_read"] = usage.get("cache_read", 0)
-                self.context["cache_create"] = usage.get("cache_create", 0)
-                self.context["output_total"] += usage.get("output", 0)
-                th = usage.get("thinking", 0)
-                self.context["thinking_last"] = th
-                self.context["thinking_total"] += th
+
+        # Bug #3: capture context tokens từ MỌI event có usage (tool_use + assistant_text)
+        # Vì assistant turn chứa tool_use không trigger assistant_text kind
+        usage = (event.get("payload") or {}).get("usage") or {}
+        if usage and usage.get("context", 0) > 0:
+            self.context["tokens"] = usage.get("context", 0)
+            self.context["input"] = usage.get("input", 0)
+            self.context["cache_read"] = usage.get("cache_read", 0)
+            self.context["cache_create"] = usage.get("cache_create", 0)
+            self.context["output_total"] += usage.get("output", 0)
+            th = usage.get("thinking", 0)
+            self.context["thinking_last"] = th
+            self.context["thinking_total"] += th
         elif kind == "user_msg":
             self.counters["user_msgs"] += 1
         elif kind == "agent_spawn":
