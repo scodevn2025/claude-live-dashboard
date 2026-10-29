@@ -1407,21 +1407,15 @@ renderEvent = function(ev) {
   }
 };
 
-// Reorder sections: pipeline lên UP, inventory + sessions + edits xuống DOWN
+// Reorder sections: pipeline NGAY DƯỚI hero · metadata panels xuống cuối
 (function reorder() {
   const wrap = document.querySelector('.wrap');
   const pipeline = document.querySelector('.pipeline');
-  if (wrap && pipeline) {
-    // Find các card secondary (edits, sessions, inventory) — 3 card ngay trước pipeline
-    const cards = wrap.querySelectorAll('.card[style*="margin-bottom"]');
-    const secondaryCards = Array.from(cards).filter(c => {
-      const lbl = c.querySelector('.lbl')?.textContent || '';
-      return lbl.includes('file edits') || lbl.includes('sessions') || lbl.includes('inventory');
-    });
-    // Move pipeline lên trước secondary cards
-    const firstSecondary = secondaryCards[0];
-    if (firstSecondary) wrap.insertBefore(pipeline, firstSecondary);
-    // Move footer xuống cuối (sau các secondary cards)
+  const hero = document.querySelector('.card.hero');
+  if (wrap && pipeline && hero) {
+    // Move pipeline ngay sau hero (trước counter grid + timeline)
+    hero.parentNode.insertBefore(pipeline, hero.nextSibling);
+    // Move footer xuống cuối
     const footer = wrap.querySelector('.footer');
     if (footer) wrap.appendChild(footer);
   }
