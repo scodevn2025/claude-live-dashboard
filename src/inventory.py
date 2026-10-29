@@ -1,6 +1,7 @@
-"""Inventory scanner — liệt kê MCP servers, plugins, skills đã cài trong Claude Code."""
+"""Inventory scanner — liệt kê MCP servers, plugins, skills + active sessions."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
 import orjson
 
@@ -83,15 +84,85 @@ def list_mcp_servers() -> list[dict]:
         return []
 
 
+def _extract_session_name(jsonl: Path) -> str | None:
+    """Scan first ~50 lines tìm custom-title event để lấy tên session."""
+    try:
+        with open(jsonl, "rb") as f:
+            for i, line in enumerate(f):
+                if i > 60:
+                    break
+                try:
+                    obj = orjson.loads(line)
+                    if obj.get("type") == "custom-title":
+                        title = obj.get("customTitle")
+                        if title:
+                            return str(title)[:60]
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return None
+
+
+def list_active_sessions(limit: int = 20, window_s: int = 7200) -> list[dict]:
+    """List Claude Code sessions có activity trong window (default 2h).
+
+    Returns sorted by mtime desc, each with name từ custom-title event.
+    """
+    projects_dir = Path.home() / ".claude" / "projects"
+    if not projects_dir.exists():
+        return []
+    now = time.time()
+    out = []
+    for jsonl in projects_dir.glob("*/*.jsonl"):
+        try:
+            stat = jsonl.stat()
+            age = now - stat.st_mtime
+            if age > window_s:
+                continue
+            name = _extract_session_name(jsonl) or jsonl.stem[:8]
+            out.append({
+                "id": jsonl.stem,
+                "name": name,
+                "project": jsonl.parent.name,
+                "size_mb": round(stat.st_size / 1024 / 1024, 1),
+                "mtime": stat.st_mtime,
+                "age_s": int(age),
+                "live": age < 60,       # updated < 1 min = live
+                "recent": age < 300,    # < 5 min = recent
+            })
+        except Exception:
+            continue
+    out.sort(key=lambda s: s["mtime"], reverse=True)
+    return out[:limit]
+
+
+def check_tg_gateway() -> dict:
+    """Check Telegram gateway status (plugin claudeScode_bot)."""
+    tg_dir = Path.home().parent / "Scode" / ".claude" / "plugins" / "claude-tg-gateway"
+    alt_dir = Path("D:/Projects/Claude Cowork/CLAUDE OUTPUTS/code/claude-tg-gateway")
+    folder = tg_dir if tg_dir.exists() else (alt_dir if alt_dir.exists() else None)
+    return {
+        "installed": folder is not None,
+        "folder": str(folder) if folder else None,
+        "bot": "@claudeScode_bot",
+        "note": "Plugin chạy embedded trong Claude Code, không expose HTTP endpoint riêng",
+    }
+
+
 def inventory() -> dict:
-    """Full inventory snapshot."""
+    """Full inventory snapshot + active sessions + telegram status."""
     skills = list_skills()
     plugins = list_plugins()
     mcps = list_mcp_servers()
+    sessions = list_active_sessions()
+    tg = check_tg_gateway()
     return {
         "skills": {"count": len(skills), "items": skills},
         "plugins": {"count": len(plugins), "items": plugins},
         "mcps": {"count": len(mcps), "items": mcps},
+        "sessions": {"count": len(sessions), "items": sessions},
+        "telegram": tg,
     }
 
 

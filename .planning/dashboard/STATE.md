@@ -3,6 +3,8 @@
 **Project**: claude-live-dashboard — observability realtime cho Claude Code harness
 **Owner**: ScodeVN (ba Khắc Huy)
 **Start**: 2026-10-29
+**GitHub**: https://github.com/scodevn2025/claude-live-dashboard
+**Live local**: http://127.0.0.1:8765/dashboard
 
 ## Phase tracker
 

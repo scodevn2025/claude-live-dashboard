@@ -221,8 +221,36 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
       <div class="ctx-head"><span>context tokens</span><span><b id="ctx-used">0</b> / <span id="ctx-max">200k</span></span></div>
       <div class="ctx-bar"><div class="ctx-bar-fill" id="ctx-fill"></div></div>
     </div>
+    <div class="ctx-wrap" style="margin-top: 6px; background: rgba(162,135,244,0.08); border-left: 2px solid var(--violet);">
+      <div class="ctx-head"><span><i class="ti ti-brain" style="color: var(--violet);"></i> thinking tokens</span><span><b id="think-last">0</b> last · <b id="think-total" style="color: var(--violet);">0</b> total</span></div>
+    </div>
   </div>
 </div>
+
+<div class="card" style="margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <div class="lbl">sessions · active Claude Code (last 2h)</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="sess-counts">—</div>
+  </div>
+  <div id="sess-list" class="sess-list"></div>
+</div>
+
+<style>
+.sess-list { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.sess-row { display: grid; grid-template-columns: 72px 1fr 90px 90px 70px; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 6px; transition: background 0.2s; }
+.sess-row:hover { background: var(--surface-2); }
+.sess-row.live { background: rgba(34,209,154,0.08); border-left: 2px solid var(--green); padding-left: 8px; border-radius: 0 6px 6px 0; }
+.sess-row.recent { background: rgba(74,158,255,0.05); }
+.sess-badge { font-size: 9px; padding: 2px 7px; border-radius: 10px; text-align: center; font-weight: 500; }
+.sess-badge.live { background: rgba(34,209,154,0.2); color: var(--green); animation: pulse 1.5s ease-in-out infinite; }
+.sess-badge.recent { background: rgba(74,158,255,0.15); color: var(--accent); }
+.sess-badge.idle { background: var(--surface-3); color: var(--text-muted); }
+.sess-id { color: var(--text-primary); font-weight: 500; }
+.sess-proj { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-meta { color: var(--text-muted); font-size: 10px; text-align: right; }
+.sess-tg { margin-top: 10px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; display: flex; gap: 10px; align-items: center; font-size: 10px; color: var(--text-secondary); }
+.sess-tg i { color: var(--amber); font-size: 14px; }
+</style>
 
 <div class="card" style="margin-bottom: 12px;">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -319,12 +347,12 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
       </g>
 
       <!-- Edges -->
-      <path id="edge-u-c" d="M94,110 L180,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
-      <path id="edge-c-t" d="M320,110 L420,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
-      <path id="edge-t-a" d="M580,100 Q670,100 690,70" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
-      <path id="edge-t-b" d="M580,120 Q670,120 690,160" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
-      <path id="edge-t-r" d="M580,110 L930,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
-      <path id="edge-r-u" d="M1070,110 L1176,110" class="edge" stroke="#4a4a55" marker-end="url(#arr)"/>
+      <path id="edge-u-c" d="M94,110 L180,110" class="edge" stroke="#4a4a55" />
+      <path id="edge-c-t" d="M320,110 L420,110" class="edge" stroke="#4a4a55" />
+      <path id="edge-t-a" d="M580,100 Q670,100 690,70" class="edge" stroke="#4a4a55" />
+      <path id="edge-t-b" d="M580,120 Q670,120 690,160" class="edge" stroke="#4a4a55" />
+      <path id="edge-t-r" d="M580,110 L930,110" class="edge" stroke="#4a4a55" />
+      <path id="edge-r-u" d="M1070,110 L1176,110" class="edge" stroke="#4a4a55" />
 
       <!-- Particles layer -->
       <g id="particles"></g>
@@ -470,6 +498,14 @@ function updateCounters(c, ctx) {
   if (ctx && ctx.tokens) {
     updateContextTokens(ctx.tokens, ctx.max_tokens || 200000);
   }
+  // Thinking tokens — hiển thị trong panel riêng
+  if (ctx) {
+    const fmtK = n => n >= 1000 ? (n/1000).toFixed(1) + 'k' : String(n || 0);
+    const tl = document.getElementById('think-last');
+    const tt = document.getElementById('think-total');
+    if (tl) tl.textContent = fmtK(ctx.thinking_last || 0);
+    if (tt) tt.textContent = fmtK(ctx.thinking_total || 0);
+  }
   // Update pipeline node counters
   document.getElementById('n-claude-turns').textContent = (c.assistant_turns || 0) + ' turns';
   document.getElementById('n-tool-count').textContent = (c.tool_calls || 0) + ' calls';
@@ -504,24 +540,41 @@ function emitParticle(edgeId, color) {
   const path = document.getElementById(edgeId);
   if (!path || !svg) return;
   const particles = document.getElementById('particles');
-  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  dot.setAttribute('r', '4');
-  dot.setAttribute('fill', color || '#4a9eff');
-  dot.setAttribute('filter', 'drop-shadow(0 0 6px ' + (color || '#4a9eff') + ')');
-  particles.appendChild(dot);
+  const col = color || '#4a9eff';
+  // Chuỗi 3 ô sáng chạy liên tiếp dọc edge, mỗi ô là rect rounded sáng
+  const BLOCKS = 3;
+  const BLOCK_W = 14, BLOCK_H = 7, GAP = 0.08;  // GAP = fraction of path length between blocks
   const len = path.getTotalLength();
-  const obj = { d: 0 };
+  const blocks = [];
+  for (let i = 0; i < BLOCKS; i++) {
+    const b = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    b.setAttribute('width', BLOCK_W);
+    b.setAttribute('height', BLOCK_H);
+    b.setAttribute('rx', 3);
+    b.setAttribute('fill', col);
+    b.setAttribute('filter', `drop-shadow(0 0 8px ${col})`);
+    b.setAttribute('opacity', 0.9 - i * 0.25);
+    particles.appendChild(b);
+    blocks.push(b);
+  }
+  const obj = { d: -GAP * len * (BLOCKS - 1) };
   gsap.to(obj, {
-    d: len, duration: 0.9, ease: 'power1.inOut',
+    d: len, duration: 1.1, ease: 'power1.inOut',
     onUpdate: () => {
-      const p = path.getPointAtLength(obj.d);
-      dot.setAttribute('cx', p.x);
-      dot.setAttribute('cy', p.y);
+      blocks.forEach((b, i) => {
+        const pos = obj.d + i * GAP * len;
+        if (pos < 0 || pos > len) { b.setAttribute('opacity', 0); return; }
+        const p = path.getPointAtLength(pos);
+        // Calculate rotation along path
+        const p2 = path.getPointAtLength(Math.min(len, pos + 1));
+        const angle = Math.atan2(p2.y - p.y, p2.x - p.x) * 180 / Math.PI;
+        b.setAttribute('transform', `translate(${p.x - BLOCK_W/2}, ${p.y - BLOCK_H/2}) rotate(${angle} ${BLOCK_W/2} ${BLOCK_H/2})`);
+      });
     },
-    onComplete: () => dot.remove(),
+    onComplete: () => blocks.forEach(b => b.remove()),
   });
-  // Pulse edge
-  gsap.fromTo(path, { stroke: color || '#4a9eff', strokeWidth: 3 }, { stroke: '#4a4a55', strokeWidth: 2, duration: 1.2, ease: 'power2.out' });
+  // Edge glow khi có traffic
+  gsap.fromTo(path, { stroke: col, strokeWidth: 3, opacity: 1 }, { stroke: '#4a4a55', strokeWidth: 2, opacity: 1, duration: 1.3, ease: 'power2.out' });
 }
 
 function pulseNode(nodeId, color) {
@@ -711,11 +764,44 @@ gsap.from('#pipeline-svg .edge', { opacity: 0, duration: 0.8, stagger: 0.1, dela
 
 // Enhancement 7: load inventory MCP + plugins + skills
 const activeMcps = new Set(); // Track MCPs được dùng từ tool calls mcp__<name>__
+function fmtAge(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm';
+  return Math.floor(s/3600) + 'h' + Math.floor((s%3600)/60) + 'm';
+}
+
 async function loadInventory() {
   try {
     const r = await fetch('/api/inventory');
     const inv = await r.json();
     document.getElementById('inv-counts').textContent = `${inv.mcps.count} MCP · ${inv.plugins.count} plugin · ${inv.skills.count} skill`;
+    // Session list
+    const sessList = document.getElementById('sess-list');
+    const sessCounts = document.getElementById('sess-counts');
+    if (sessList && inv.sessions) {
+      const live = inv.sessions.items.filter(s => s.live).length;
+      const recent = inv.sessions.items.filter(s => s.recent && !s.live).length;
+      sessCounts.textContent = `${live} live · ${recent} recent · ${inv.sessions.count - live - recent} idle`;
+      // Update hero với session name khi match session hiện tại
+    const curSess = inv.sessions.items.find(s => s.id === state.lastSessionId);
+    if (curSess) {
+      document.getElementById('session-name').textContent = curSess.name;
+      document.getElementById('sess-id').textContent = curSess.name;
+    }
+    sessList.innerHTML = inv.sessions.items.map(s => {
+        const cls = s.live ? 'live' : (s.recent ? 'recent' : 'idle');
+        const label = s.live ? 'LIVE' : (s.recent ? 'recent' : 'idle');
+        return `<div class="sess-row ${cls}" title="${s.id}">
+          <span class="sess-badge ${cls}">${label}</span>
+          <span class="sess-id">${s.name}</span>
+          <span class="sess-proj">${s.project.slice(0,36)}</span>
+          <span class="sess-meta">${s.size_mb} MB</span>
+          <span class="sess-meta">${fmtAge(s.age_s)} ago</span>
+        </div>`;
+      }).join('') +
+      (inv.telegram.installed ? `<div class="sess-tg"><i class="ti ti-brand-telegram"></i><span>Telegram bot: <b style="color: var(--text-primary);">${inv.telegram.bot}</b> · gateway plugin installed · ${inv.telegram.note}</span></div>` : '');
+      gsap.from('.sess-row', { opacity: 0, x: -8, duration: 0.3, stagger: 0.04, ease: 'power2.out' });
+    }
     document.getElementById('inv-mcp-n').textContent = inv.mcps.count;
     document.getElementById('inv-plug-n').textContent = inv.plugins.count;
     document.getElementById('inv-skill-n').textContent = inv.skills.count;
@@ -737,6 +823,16 @@ async function loadInventory() {
   } catch (e) { console.error('inventory', e); }
 }
 loadInventory();
+// Refresh sessions + inventory mỗi 5s (lightweight)
+setInterval(loadInventory, 5000);
+
+// Pipeline: emit particles liên tục khi activeTools > 0 (dòng chảy)
+setInterval(() => {
+  if (activeTools > 0) {
+    emitParticle('edge-c-t', '#4a9eff');
+    emitParticle('edge-t-r', '#22d19a');
+  }
+}, 700);
 
 // Highlight MCP khi dùng — hook vào renderEvent
 const origRender = renderEvent;

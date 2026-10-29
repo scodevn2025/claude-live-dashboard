@@ -141,9 +141,11 @@ def _parse_assistant(obj: dict, ts: float, eid: str | None) -> list[dict]:
         cache_create = usage.get("cache_creation_input_tokens", 0)
         cache_read = usage.get("cache_read_input_tokens", 0)
         output_t = usage.get("output_tokens", 0)
+        thinking_t = (usage.get("output_tokens_details") or {}).get("thinking_tokens", 0)
         usage_summary = {
             "input": input_t, "output": output_t,
             "cache_read": cache_read, "cache_create": cache_create,
+            "thinking": thinking_t,
             # Context size = tổng tất cả tokens của turn này
             "context": input_t + cache_create + cache_read,
         }

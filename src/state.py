@@ -30,6 +30,8 @@ class SessionState:
             "output_total": 0,     # cumulative output
             "cache_read": 0,       # tổng cache read lúc gần nhất
             "cache_create": 0,
+            "thinking_total": 0,   # cumulative thinking tokens (extended thinking)
+            "thinking_last": 0,    # thinking tokens turn gần nhất
             "max_tokens": 200000,  # Claude context limit
         }
 
@@ -61,6 +63,9 @@ class SessionState:
                 self.context["cache_read"] = usage.get("cache_read", 0)
                 self.context["cache_create"] = usage.get("cache_create", 0)
                 self.context["output_total"] += usage.get("output", 0)
+                th = usage.get("thinking", 0)
+                self.context["thinking_last"] = th
+                self.context["thinking_total"] += th
         elif kind == "user_msg":
             self.counters["user_msgs"] += 1
         elif kind == "agent_spawn":
@@ -91,7 +96,7 @@ class SessionState:
         self.pending_tools.clear()
         for k in self.counters:
             self.counters[k] = 0
-        for k in ("tokens", "input", "output_total", "cache_read", "cache_create"):
+        for k in ("tokens", "input", "output_total", "cache_read", "cache_create", "thinking_total", "thinking_last"):
             self.context[k] = 0
 
     def recent(self, n: int = 50) -> list[dict]:
