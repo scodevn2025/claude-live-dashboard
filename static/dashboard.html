@@ -407,13 +407,13 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
     </div>
     <div class="inv-col">
       <div style="font-size: 11px; font-weight: 500; color: var(--amber); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-sparkles tl-icon"></i> Skills</span><span id="inv-skill-n" style="color: var(--text-muted);">0</span></div>
-      <div id="inv-skills" class="inv-list" style="max-height: 120px; overflow-y: auto;"></div>
+      <div id="inv-skills" class="inv-list"></div>
     </div>
   </div>
 </div>
 
 <style>
-.inv-list { font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 1.8; color: var(--text-secondary); }
+.inv-list { font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 1.8; color: var(--text-secondary); max-height: 220px; overflow-y: auto; padding-right: 4px; }
 .inv-item { padding: 2px 6px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; gap: 6px; transition: background 0.15s; }
 .inv-item:hover { background: var(--surface-2); color: var(--text-primary); }
 .inv-item .meta { color: var(--text-muted); font-size: 9px; }
