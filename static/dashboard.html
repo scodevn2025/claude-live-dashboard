@@ -189,6 +189,31 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
   </div>
 </div>
 
+<div class="card thinking-card" style="margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <div class="lbl"><i class="ti ti-brain" style="color: var(--violet);"></i> thinking content · 10 gần nhất</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="think-count">0</div>
+  </div>
+  <div id="think-list" class="think-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ extended thinking event…</div>
+  </div>
+</div>
+
+<style>
+.think-list { font-size: 11px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.think-list::-webkit-scrollbar { width: 4px; }
+.think-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+.think-row { padding: 8px 10px; background: var(--surface-1); border-left: 2px solid var(--violet); border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+.think-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 5px; font-size: 10px; color: var(--text-muted); }
+.think-head .think-ts { font-weight: 500; }
+.think-tok { background: rgba(162,135,244,0.15); color: var(--violet); padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 500; }
+.think-text { color: var(--text-primary); white-space: pre-wrap; word-break: break-word; font-size: 11px; line-height: 1.45; max-height: 68px; overflow: hidden; position: relative; }
+.think-text.expanded { max-height: none; }
+.think-text:not(.expanded)::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: linear-gradient(transparent, var(--surface-1)); pointer-events: none; }
+.think-more { background: none; border: none; color: var(--violet); font-size: 10px; cursor: pointer; padding: 3px 0 0; font-family: 'JetBrains Mono', monospace; }
+.think-more:hover { text-decoration: underline; }
+</style>
+
 <div class="grid g4 counter-grid" style="margin-bottom: 12px;">
   <div class="card"><div class="lbl">agent spawns</div><div class="val" id="c-agents">0</div><div class="sub">subagents created</div></div>
   <div class="card"><div class="lbl">assistant turns</div><div class="val" id="c-turns">0</div><div class="sub">text responses</div></div>
@@ -276,6 +301,22 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .cmd-text .bg-badge { background: rgba(255,181,71,0.2); color: var(--amber); padding: 1px 6px; border-radius: 8px; font-size: 9px; margin-right: 6px; font-weight: 500; }
 .cmd-dur { color: var(--text-muted); font-size: 10px; font-style: italic; }
 .cmd-dur.live { color: var(--accent); animation: pulse 1.4s ease-in-out infinite; font-weight: 500; }
+
+/* Diff-based update: flash yellow khi field thay đổi, không re-render toàn bộ */
+@keyframes fieldFlash {
+  0% { background-color: rgba(255,181,71,0.4); }
+  100% { background-color: transparent; }
+}
+.field-updated { animation: fieldFlash 1.2s ease-out; border-radius: 3px; padding: 1px 4px; margin: -1px -4px; }
+
+@keyframes rowAppear {
+  0% { opacity: 0; transform: translateX(-10px); background-color: rgba(34,209,154,0.3); }
+  100% { opacity: 1; transform: translateX(0); background-color: transparent; }
+}
+.row-appeared { animation: rowAppear 0.5s ease-out; }
+
+@keyframes rowDisappear { to { opacity: 0; transform: translateX(10px); max-height: 0; padding: 0; margin: 0; } }
+.row-disappearing { animation: rowDisappear 0.4s ease-in forwards; overflow: hidden; }
 </style>
 
 <div class="card" style="margin-bottom: 12px;">
@@ -1070,6 +1111,7 @@ async function loadSnapshot() {
     updateCounters(s.counters, s.context);
     renderAgentTree(s);
     renderSkills(s);
+    renderThinkings(s.thinking_recent || []);
     document.getElementById('timeline').innerHTML = '';
     state.kindTally = {};
     s.events.slice(-50).forEach(renderEvent);
@@ -1119,6 +1161,7 @@ function connect() {
       updateCounters(s.counters, s.context);
       renderAgentTree(s);
       renderSkills(s);
+      renderThinkings(s.thinking_recent || []);
       // Session switch detect
       if (state.lastSessionId && s.session_id !== state.lastSessionId) {
         document.getElementById('session-name').textContent = s.session_id.slice(0, 8);
@@ -1229,63 +1272,196 @@ function fmtAge(s) {
   return Math.floor(s/86400) + 'ng trước';
 }
 
+// Diff helpers — tránh re-render toàn bộ list mỗi tick (nguồn gốc gây flicker + GSAP re-run).
+function setTextIfChanged(el, newText) {
+  if (!el) return;
+  if (el.textContent !== String(newText)) {
+    el.textContent = newText;
+    el.classList.remove('field-updated');
+    // Force reflow để animation chạy lại
+    void el.offsetWidth;
+    el.classList.add('field-updated');
+  }
+}
+function diffRenderList(container, items, keyFn, buildHtml, updateRow) {
+  if (!container) return;
+  const empty = container.querySelector('[data-empty-placeholder]');
+  if (empty) empty.remove();
+  const existing = new Map();
+  for (const row of container.querySelectorAll('[data-key]')) {
+    existing.set(row.dataset.key, row);
+  }
+  const seen = new Set();
+  let lastNode = null;
+  items.forEach((it, i) => {
+    const key = String(keyFn(it, i));
+    seen.add(key);
+    let row = existing.get(key);
+    if (row) {
+      // Row cũ: update inline qua updateRow nếu có, không recreate
+      if (updateRow) updateRow(row, it, i);
+      row.classList.remove('row-disappearing');
+      // Giữ thứ tự
+      if (lastNode) {
+        if (row.previousElementSibling !== lastNode) container.insertBefore(row, lastNode.nextSibling);
+      } else {
+        if (container.firstChild !== row) container.insertBefore(row, container.firstChild);
+      }
+    } else {
+      // Row mới: tạo từ HTML, flag appear
+      const tmp = document.createElement('div');
+      tmp.innerHTML = buildHtml(it, i);
+      row = tmp.firstElementChild;
+      if (!row) return;
+      row.dataset.key = key;
+      row.classList.add('row-appeared');
+      setTimeout(() => row.classList.remove('row-appeared'), 600);
+      if (lastNode) container.insertBefore(row, lastNode.nextSibling);
+      else container.insertBefore(row, container.firstChild);
+    }
+    lastNode = row;
+  });
+  // Xoá row không còn trong items (fade out)
+  for (const [key, row] of existing) {
+    if (!seen.has(key)) {
+      row.classList.add('row-disappearing');
+      setTimeout(() => row.remove(), 420);
+    }
+  }
+}
+
 async function loadInventory() {
   try {
     const r = await fetch('/api/inventory');
     const inv = await r.json();
-    document.getElementById('inv-counts').textContent = `${inv.mcps.count} MCP · ${inv.plugins.count} plugin · ${inv.skills.count} skill`;
-    // Session list
+    setTextIfChanged(document.getElementById('inv-counts'),
+      `${inv.mcps.count} MCP · ${inv.plugins.count} plugin · ${inv.skills.count} skill`);
+    // Session list — diff render
     const sessList = document.getElementById('sess-list');
     const sessCounts = document.getElementById('sess-counts');
     if (sessList && inv.sessions) {
       const live = inv.sessions.items.filter(s => s.live).length;
       const recent = inv.sessions.items.filter(s => s.recent && !s.live).length;
-      sessCounts.textContent = `${live} live · ${recent} recent · ${inv.sessions.count - live - recent} idle`;
-      // Update hero với session name khi match session hiện tại
-    const curSess = inv.sessions.items.find(s => s.id === state.lastSessionId);
-    if (curSess) {
-      document.getElementById('session-name').textContent = curSess.name;
-      document.getElementById('sess-id').textContent = curSess.name;
+      setTextIfChanged(sessCounts, `${live} live · ${recent} recent · ${inv.sessions.count - live - recent} idle`);
+      const curSess = inv.sessions.items.find(s => s.id === state.lastSessionId);
+      if (curSess) {
+        setTextIfChanged(document.getElementById('session-name'), curSess.name);
+        setTextIfChanged(document.getElementById('sess-id'), curSess.name);
+      }
+      // Tách sess-tg (telegram footer) sang container riêng để diff list không đụng tới
+      const tgEl = sessList.querySelector('.sess-tg');
+      if (tgEl) tgEl.remove();
+      diffRenderList(sessList, inv.sessions.items,
+        (s) => s.id,
+        (s, i) => {
+          const cls = s.live ? 'live' : (s.recent ? 'recent' : 'idle');
+          const icon = s.live ? 'ti ti-player-play-filled' : (s.recent ? 'ti ti-circle-dot-filled' : 'ti ti-circle');
+          const projShort = s.project.replace(/^D--Projects-/, '').slice(0, 24);
+          const pinned = state.pinnedSessionId === s.id ? ' pinned' : '';
+          return `<div class="sess-row ${cls}${pinned}" data-id="${s.id}" title="click để pin · ${s.id}">
+            <span class="sess-num" data-f="num">${i + 1}.</span>
+            <i class="${icon} sess-icon ${cls}" data-f="icon"></i>
+            <span class="sess-id" data-f="name">${s.name}<span class="project">${projShort}</span></span>
+            <span class="sess-meta" data-f="age">${fmtAge(s.age_s)}</span>
+            <span class="sess-resume" data-resume="${s.id}" title="copy lệnh: claude --resume ${s.id}">⤴</span>
+          </div>`;
+        },
+        (row, s, i) => {
+          const cls = s.live ? 'live' : (s.recent ? 'recent' : 'idle');
+          const pinned = state.pinnedSessionId === s.id;
+          const want = `sess-row ${cls}${pinned ? ' pinned' : ''}`;
+          if (row.className !== want) row.className = want;
+          setTextIfChanged(row.querySelector('[data-f="num"]'), `${i + 1}.`);
+          setTextIfChanged(row.querySelector('[data-f="age"]'), fmtAge(s.age_s));
+        }
+      );
+      // Append sess-tg lại nếu có
+      if (inv.telegram.installed) {
+        const tgHtml = `<div class="sess-tg"><i class="ti ti-brand-telegram"></i><span>Telegram bot: <b style="color: var(--text-primary);">${inv.telegram.bot}</b> · gateway plugin installed · ${inv.telegram.note}</span></div>`;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = tgHtml;
+        sessList.appendChild(tmp.firstElementChild);
+      }
     }
-    sessList.innerHTML = inv.sessions.items.map((s, i) => {
-        const cls = s.live ? 'live' : (s.recent ? 'recent' : 'idle');
-        const icon = s.live ? 'ti ti-player-play-filled' : (s.recent ? 'ti ti-circle-dot-filled' : 'ti ti-circle');
-        const projShort = s.project.replace(/^D--Projects-/, '').slice(0, 24);
-        const pinned = state.pinnedSessionId === s.id ? ' pinned' : '';
-        return `<div class="sess-row ${cls}${pinned}" data-id="${s.id}" title="click để pin · ${s.id}">
-          <span class="sess-num">${i + 1}.</span>
-          <i class="${icon} sess-icon ${cls}"></i>
-          <span class="sess-id">${s.name}<span class="project">${projShort}</span></span>
-          <span class="sess-meta">${fmtAge(s.age_s)}</span>
-          <span class="sess-resume" data-resume="${s.id}" title="copy lệnh: claude --resume ${s.id}">⤴</span>
-        </div>`;
-      }).join('') +
-      (inv.telegram.installed ? `<div class="sess-tg"><i class="ti ti-brand-telegram"></i><span>Telegram bot: <b style="color: var(--text-primary);">${inv.telegram.bot}</b> · gateway plugin installed · ${inv.telegram.note}</span></div>` : '');
-      gsap.from('.sess-row', { opacity: 0, x: -8, duration: 0.3, stagger: 0.04, ease: 'power2.out' });
-    }
-    document.getElementById('inv-mcp-n').textContent = inv.mcps.count;
-    document.getElementById('inv-plug-n').textContent = inv.plugins.count;
-    document.getElementById('inv-skill-n').textContent = inv.skills.count;
-    // Render MCP list
-    document.getElementById('inv-mcps').innerHTML = inv.mcps.items.map(m =>
-      `<div class="inv-item" data-mcp="${m.name}"><span><span class="pulse"></span> ${m.name}</span><span class="meta">${m.kind}</span></div>`
-    ).join('') || '<div style="color: var(--text-muted);">(empty)</div>';
-    // Render plugins
-    const pluginsHtml = inv.plugins.items.map(p =>
-      `<div class="inv-item"><span>${p.name}</span><span class="meta">${p.version || ''}</span></div>`
-    ).join('');
-    document.getElementById('inv-plugins').innerHTML = pluginsHtml || '<div style="color: var(--text-muted);">(none installed)</div>';
-    // Render skills
-    document.getElementById('inv-skills').innerHTML = inv.skills.items.map(s =>
-      `<div class="inv-item" title="${(s.description || '').replace(/"/g, '&quot;')}"><span>${s.name}</span><span class="meta">${s.source || ''}</span></div>`
-    ).join('');
-    // Stagger enter
-    gsap.from('.inv-item', { opacity: 0, x: -8, duration: 0.3, stagger: 0.01, ease: 'power2.out' });
+    setTextIfChanged(document.getElementById('inv-mcp-n'), inv.mcps.count);
+    setTextIfChanged(document.getElementById('inv-plug-n'), inv.plugins.count);
+    setTextIfChanged(document.getElementById('inv-skill-n'), inv.skills.count);
+    // MCP list — diff
+    diffRenderList(document.getElementById('inv-mcps'), inv.mcps.items,
+      (m) => m.name,
+      (m) => `<div class="inv-item" data-mcp="${m.name}"><span><span class="pulse"></span> ${m.name}</span><span class="meta" data-f="kind">${m.kind}</span></div>`,
+      (row, m) => setTextIfChanged(row.querySelector('[data-f="kind"]'), m.kind)
+    );
+    // Plugins — diff
+    diffRenderList(document.getElementById('inv-plugins'), inv.plugins.items,
+      (p) => p.name,
+      (p) => `<div class="inv-item"><span>${p.name}</span><span class="meta" data-f="ver">${p.version || ''}</span></div>`,
+      (row, p) => setTextIfChanged(row.querySelector('[data-f="ver"]'), p.version || '')
+    );
+    // Skills — diff
+    diffRenderList(document.getElementById('inv-skills'), inv.skills.items,
+      (s) => s.name,
+      (s) => `<div class="inv-item" title="${(s.description || '').replace(/"/g, '&quot;')}"><span>${s.name}</span><span class="meta" data-f="src">${s.source || ''}</span></div>`,
+      (row, s) => setTextIfChanged(row.querySelector('[data-f="src"]'), s.source || '')
+    );
   } catch (e) { console.error('inventory', e); }
 }
 loadInventory();
-// Refresh sessions + inventory mỗi 5s (lightweight)
-setInterval(loadInventory, 5000);
+// Refresh sessions + inventory mỗi 7s (lightweight, diff-based — không re-render toàn bộ)
+setInterval(loadInventory, 7000);
+
+// Thinking content panel — diff render từ snapshot.thinking_recent
+function fmtClockFromTs(ts) {
+  const d = new Date((ts || 0) * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function escapeHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function renderThinkings(items) {
+  const list = document.getElementById('think-list');
+  if (!list) return;
+  const cnt = document.getElementById('think-count');
+  if (!items || items.length === 0) {
+    if (!list.querySelector('[data-empty-placeholder]')) {
+      list.innerHTML = '<div data-empty-placeholder style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ extended thinking event…</div>';
+    }
+    setTextIfChanged(cnt, '0');
+    return;
+  }
+  setTextIfChanged(cnt, items.length + ' thinking');
+  // Mới nhất lên đầu
+  const sorted = items.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  diffRenderList(list, sorted,
+    (t) => (t.ts + '_' + ((t.text || '').length)),
+    (t) => {
+      const text = escapeHtml(t.text || '');
+      return `<div class="think-row">
+        <div class="think-head">
+          <span class="think-ts" data-f="ts">${fmtClockFromTs(t.ts)}</span>
+          <span class="think-tok" data-f="tok">${t.tokens || 0} tok</span>
+        </div>
+        <div class="think-text" data-f="text">${text}</div>
+        <button type="button" class="think-more" data-more>show more</button>
+      </div>`;
+    },
+    (row, t) => {
+      setTextIfChanged(row.querySelector('[data-f="ts"]'), fmtClockFromTs(t.ts));
+      setTextIfChanged(row.querySelector('[data-f="tok"]'), (t.tokens || 0) + ' tok');
+    }
+  );
+  // Bind show more / show less (idempotent — chỉ bind khi chưa có)
+  list.querySelectorAll('.think-more:not([data-bound])').forEach(btn => {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const txt = btn.parentElement.querySelector('.think-text');
+      if (!txt) return;
+      const expanded = txt.classList.toggle('expanded');
+      btn.textContent = expanded ? 'show less' : 'show more';
+    });
+  });
+}
 
 async function unpinSession() {
   try {

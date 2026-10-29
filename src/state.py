@@ -31,6 +31,10 @@ class SessionState:
         self.skill_tally: dict[str, int] = {} # skill_name → invocation count
         self.tool_tally: dict[str, int] = {}  # tool_name → count (for hot path)
 
+        # Nội dung thinking gần nhất (extended thinking blocks)
+        self.recent_thinkings: deque[dict] = deque(maxlen=10)
+        self._thinking_seen_ids: set[str] = set()  # dedup by event id
+
         # Context window usage từ assistant message.usage
         self.context: dict[str, int] = {
             "tokens": 0,          # tổng context lúc assistant trả lời gần nhất
@@ -111,9 +115,24 @@ class SessionState:
         elif kind == "assistant_text":
             self.counters["assistant_turns"] += 1
 
+        # Capture thinking text từ bất kỳ event nào có thinking_text (dedup bằng event id)
+        payload = event.get("payload") or {}
+        tt = payload.get("thinking_text")
+        if tt and event.get("id") not in self._thinking_seen_ids:
+            self._thinking_seen_ids.add(event["id"])
+            if len(self._thinking_seen_ids) > 200:
+                # Trim dedup set để không tràn
+                self._thinking_seen_ids = set(list(self._thinking_seen_ids)[-100:])
+            tokens = (payload.get("usage") or {}).get("thinking", 0)
+            self.recent_thinkings.append({
+                "ts": event["ts"],
+                "text": tt,
+                "tokens": tokens,
+            })
+
         # Bug #3: capture context tokens từ MỌI event có usage (tool_use + assistant_text)
         # Vì assistant turn chứa tool_use không trigger assistant_text kind
-        usage = (event.get("payload") or {}).get("usage") or {}
+        usage = payload.get("usage") or {}
         if usage and usage.get("context", 0) > 0:
             self.context["tokens"] = usage.get("context", 0)
             self.context["input"] = usage.get("input", 0)
@@ -143,6 +162,7 @@ class SessionState:
             "skill_tally": dict(self.skill_tally),
             "tool_tally": dict(self.tool_tally),
             "events": list(self.events),
+            "thinking_recent": list(self.recent_thinkings),
             "pending_tools": {
                 tid: {"name": t["name"], "ts": t["ts"]}
                 for tid, t in self.pending_tools.items()
@@ -160,6 +180,8 @@ class SessionState:
         self.bg_tasks.clear()
         self.skill_tally.clear()
         self.tool_tally.clear()
+        self.recent_thinkings.clear()
+        self._thinking_seen_ids.clear()
         for k in self.counters:
             self.counters[k] = 0
         for k in ("tokens", "input", "output_total", "cache_read", "cache_create", "thinking_total", "thinking_last"):

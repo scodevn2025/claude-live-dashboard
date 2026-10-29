@@ -152,10 +152,17 @@ def _parse_assistant(obj: dict, ts: float, eid: str | None) -> list[dict]:
 
     events: list[dict] = []
     text_chars = 0
+    thinking_text = ""
     for block in content:
         if not isinstance(block, dict):
             continue
         btype = block.get("type")
+        if btype == "thinking":
+            # Claude extended thinking block (field name is "thinking", not "text")
+            t = block.get("thinking") or block.get("text") or ""
+            if t:
+                thinking_text += (("\n\n" if thinking_text else "") + t)
+            continue
         if btype == "tool_use":
             tool_name = block.get("name", "unknown")
             tool_id = block.get("id", "")
@@ -183,9 +190,18 @@ def _parse_assistant(obj: dict, ts: float, eid: str | None) -> list[dict]:
         elif btype == "text":
             text_chars += len(block.get("text", ""))
     if text_chars > 0:
-        events.append(_norm(KIND_ASSISTANT_TEXT, "", payload={"chars": text_chars, "usage": usage_summary}, ts=ts, event_id=eid))
+        payload = {"chars": text_chars, "usage": usage_summary}
+        if thinking_text:
+            payload["thinking_text"] = thinking_text
+        events.append(_norm(KIND_ASSISTANT_TEXT, "", payload=payload, ts=ts, event_id=eid))
     if not events:
-        events.append(_norm(KIND_ASSISTANT_TEXT, "", payload={"usage": usage_summary}, ts=ts, event_id=eid))
+        payload = {"usage": usage_summary}
+        if thinking_text:
+            payload["thinking_text"] = thinking_text
+        events.append(_norm(KIND_ASSISTANT_TEXT, "", payload=payload, ts=ts, event_id=eid))
+    elif thinking_text:
+        # Attach thinking to first tool_use event của turn (same assistant message)
+        events[0]["payload"]["thinking_text"] = thinking_text
     return events
 
 
