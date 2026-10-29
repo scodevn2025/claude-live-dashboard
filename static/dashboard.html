@@ -207,10 +207,17 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
   <div class="card">
     <div class="lbl">agent tree · spawn hierarchy</div>
     <div class="tree" id="tree">
-      <div class="tree-node"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;">main session</span><span class="tree-status live">active</span></div>
-      <div id="tree-children"></div>
+      <div class="tree-node has-children open"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;" id="tree-main-name">main session</span><span class="tree-status live">active</span></div>
+      <div id="tree-children" class="tree-children"></div>
     </div>
-    <div style="margin-top: 16px; padding-top: 12px; border-top: 0.5px solid var(--border);">
+    <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--border);">
+      <div class="lbl">harness skills · time share</div>
+      <div id="skills-share" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+        <div style="color: var(--text-muted); padding: 4px 0;">chưa có skill invocation</div>
+      </div>
+      <div id="hot-path" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;"></div>
+    </div>
+    <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--border);">
       <div class="lbl">event kinds breakdown</div>
       <div class="kinds-bar" id="kinds-bar"></div>
       <div class="kinds-legend" id="kinds-legend"></div>
@@ -230,6 +237,46 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
     </div>
   </div>
 </div>
+
+<div class="card" style="margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <div class="lbl">commands · bash / powershell / python / node · realtime</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="cmds-count">0 cmds</div>
+  </div>
+  <div id="cmds-list" class="cmds-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ Bash tool call…</div>
+  </div>
+</div>
+
+<style>
+.cmds-list { font-size: 11px; max-height: 200px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; }
+.cmds-list::-webkit-scrollbar { width: 4px; }
+.cmds-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+.cmd-row { display: grid; grid-template-columns: 60px 20px 70px 1fr auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 5px; margin-bottom: 2px; transition: background 0.2s; border-left: 2px solid transparent; }
+.cmd-row:hover { background: var(--surface-2); }
+.cmd-row.running { background: rgba(74,158,255,0.08); border-left-color: var(--accent); }
+.cmd-row.background { background: rgba(255,181,71,0.06); border-left-color: var(--amber); }
+.cmd-row.err { background: rgba(255,92,90,0.1); border-left-color: var(--red); }
+.cmd-time { color: var(--text-muted); font-size: 10px; }
+.cmd-rt-icon { font-size: 14px; text-align: center; }
+.cmd-rt-icon.bash { color: var(--accent); }
+.cmd-rt-icon.pwsh { color: var(--cyan); }
+.cmd-rt-icon.python { color: var(--amber); }
+.cmd-rt-icon.node { color: var(--green); }
+.cmd-rt-icon.git { color: var(--orange); }
+.cmd-rt-icon.other { color: var(--text-muted); }
+.cmd-rt { font-size: 9px; padding: 2px 7px; border-radius: 8px; text-align: center; font-weight: 500; }
+.cmd-rt.bash { background: rgba(74,158,255,0.15); color: var(--accent); }
+.cmd-rt.pwsh { background: rgba(74,217,228,0.15); color: var(--cyan); }
+.cmd-rt.python { background: rgba(255,181,71,0.15); color: var(--amber); }
+.cmd-rt.node { background: rgba(34,209,154,0.15); color: var(--green); }
+.cmd-rt.git { background: rgba(255,132,81,0.15); color: var(--orange); }
+.cmd-rt.other { background: var(--surface-3); color: var(--text-muted); }
+.cmd-text { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.cmd-text .bg-badge { background: rgba(255,181,71,0.2); color: var(--amber); padding: 1px 6px; border-radius: 8px; font-size: 9px; margin-right: 6px; font-weight: 500; }
+.cmd-dur { color: var(--text-muted); font-size: 10px; font-style: italic; }
+.cmd-dur.live { color: var(--accent); animation: pulse 1.4s ease-in-out infinite; font-weight: 500; }
+</style>
 
 <div class="card" style="margin-bottom: 12px;">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -271,15 +318,20 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 
 <div class="card" style="margin-bottom: 12px;">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <div class="lbl">sessions · active Claude Code (last 2h)</div>
+    <div class="lbl">phiên gần đây · click để pin · icon ⤴ copy lệnh resume</div>
     <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="sess-counts">—</div>
   </div>
   <div id="sess-list" class="sess-list"></div>
 </div>
 
 <style>
-.sess-list { font-size: 12px; }
-.sess-row { display: grid; grid-template-columns: 22px 18px 1fr auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 6px; transition: background 0.2s; cursor: default; }
+.sess-list { font-size: 12px; max-height: 300px; overflow-y: auto; }
+.sess-list::-webkit-scrollbar { width: 4px; }
+.sess-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+.sess-row { display: grid; grid-template-columns: 22px 18px 1fr auto 26px; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 6px; transition: background 0.2s; cursor: default; }
+.sess-resume { color: var(--text-muted); cursor: pointer; padding: 3px 6px; border-radius: 4px; font-size: 13px; transition: all 0.2s; }
+.sess-resume:hover { background: var(--surface-3); color: var(--accent); transform: scale(1.1); }
+.sess-resume.copied { color: var(--green) !important; }
 .sess-row:hover { background: var(--surface-2); }
 .sess-row.live { background: rgba(74,158,255,0.08); border-left: 2px solid var(--accent); padding-left: 8px; border-radius: 0 6px 6px 0; }
 .sess-row.recent { background: rgba(74,158,255,0.03); }
@@ -508,9 +560,49 @@ let state = { counters: {}, startedAt: Date.now() / 1000, kindTally: {}, ctxToke
 let evTimes = [];
 let activeTools = 0;
 // Track file edit operations realtime
-const EDIT_TOOLS = ['Write', 'Edit', 'Read', 'Grep', 'Glob', 'Bash'];
+const EDIT_TOOLS = ['Write', 'Edit', 'Read', 'Grep', 'Glob'];
 const recentEdits = []; // {ts, name, file, duration, status}
 const pendingEdits = new Map(); // tool_use_id → edit entry
+
+// Track Bash commands với runtime detection
+const recentCmds = [];
+const pendingCmds = new Map();
+
+function detectRuntime(cmd) {
+  const c = (cmd || '').trim().toLowerCase();
+  if (/^(powershell|pwsh|cmd|cmd\/c|cmd\s)/.test(c)) return 'pwsh';
+  if (/^(python|py\s|uv run python|poetry run python|pytest)/.test(c)) return 'python';
+  if (/^(node|npm|npx|yarn|pnpm|bun\s|tsc)/.test(c)) return 'node';
+  if (/^(git\s|gh\s|git$)/.test(c)) return 'git';
+  if (/^(curl|wget|ssh|scp|adb\s|ffmpeg|docker)/.test(c)) return 'bash';
+  return 'bash';
+}
+function runtimeIcon(rt) {
+  return {bash:'ti-terminal-2', pwsh:'ti-brand-powershell', python:'ti-brand-python',
+          node:'ti-brand-nodejs', git:'ti-brand-git', other:'ti-terminal'}[rt] || 'ti-terminal-2';
+}
+
+function renderCmds() {
+  const list = document.getElementById('cmds-list');
+  if (!list) return;
+  document.getElementById('cmds-count').textContent = `${recentCmds.length} cmds · ${pendingCmds.size} đang chạy`;
+  if (recentCmds.length === 0) { return; }
+  const items = recentCmds.slice(-30).reverse();
+  list.innerHTML = items.map(c => {
+    const isLive = c.status === 'running';
+    const cls = c.status === 'error' ? 'err' : (c.background ? 'background' : (isLive ? 'running' : ''));
+    const bgBadge = c.background ? '<span class="bg-badge">bg</span>' : '';
+    const timeStr = new Date(c.ts * 1000).toTimeString().slice(0,8);
+    const dur = isLive ? '…' : (c.duration ? c.duration.toFixed(1) + 's' : '');
+    return `<div class="cmd-row ${cls}" title="${(c.cmd||'').replace(/"/g,'&quot;')}">
+      <span class="cmd-time">${timeStr}</span>
+      <i class="ti ${runtimeIcon(c.runtime)} cmd-rt-icon ${c.runtime}"></i>
+      <span class="cmd-rt ${c.runtime}">${c.runtime}</span>
+      <span class="cmd-text">${bgBadge}${(c.cmd||'').slice(0, 120)}</span>
+      <span class="cmd-dur ${isLive ? 'live' : ''}">${dur}</span>
+    </div>`;
+  }).join('');
+}
 
 function renderEdits() {
   const list = document.getElementById('edits-list');
@@ -659,6 +751,65 @@ function updateCounters(c, ctx) {
   state.counters = c;
 }
 
+function renderAgentTree(snapshot) {
+  const children = document.getElementById('tree-children');
+  const mainName = document.getElementById('tree-main-name');
+  if (!children) return;
+  if (mainName && snapshot.session_id) mainName.textContent = 'main · ' + (document.getElementById('session-name').textContent || snapshot.session_id.slice(0,8));
+  const parts = [];
+  const subagents = (snapshot.subagents || []);
+  const bg = (snapshot.bg_tasks || []);
+  const all = [...subagents.map(s => ({...s, _kind: 'fork'})), ...bg.map(b => ({...b, _kind: 'bg'}))];
+  all.forEach((item, i) => {
+    const isLast = i === all.length - 1;
+    const branch = isLast ? '└─' : '├─';
+    const kindLabel = item._kind === 'fork' ? 'fork' : 'bg';
+    const kindIcon = item._kind === 'fork' ? 'ti-git-fork' : 'ti-cloud-cog';
+    const kindColor = item._kind === 'fork' ? 'var(--pink)' : 'var(--amber)';
+    const statusCls = item.status === 'running' ? 'live' : (item.status === 'error' ? 'err' : 'done');
+    const meta = item.duration ? item.duration.toFixed(1) + 's' : (item.summary || '').slice(0, 40);
+    parts.push(`<div class="tree-node">
+      <span class="tree-indent">${branch} </span>
+      <i class="ti ${kindIcon} tl-icon" style="color: ${kindColor};"></i>
+      <span>${kindLabel} · <b>${(item.name || '').slice(0, 20)}</b></span>
+      <span class="tree-status ${statusCls}">${item.status}</span>
+      <span style="color: var(--text-muted); font-size: 10px; margin-left: 6px;">${meta}</span>
+    </div>`);
+  });
+  children.innerHTML = parts.join('') || '<div style="color: var(--text-muted); font-size: 11px; padding-left: 20px;">no fork/bg tasks</div>';
+}
+
+function renderSkills(snapshot) {
+  const el = document.getElementById('skills-share');
+  const hotEl = document.getElementById('hot-path');
+  const tally = snapshot.skill_tally || {};
+  const total = Object.values(tally).reduce((a,b) => a+b, 0);
+  if (!el) return;
+  if (total === 0) {
+    el.innerHTML = '<div style="color: var(--text-muted); padding: 4px 0;">chưa có skill invocation</div>';
+    hotEl.innerHTML = '';
+    return;
+  }
+  const sorted = Object.entries(tally).sort((a,b) => b[1] - a[1]);
+  const colors = ['var(--accent)', 'var(--green)', 'var(--violet)', 'var(--orange)', 'var(--pink)', 'var(--amber)'];
+  el.innerHTML = sorted.slice(0, 6).map(([name, n], i) => {
+    const pct = (n / total * 100).toFixed(0);
+    return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+      <span style="min-width:110px; color:var(--text-primary);">${name}</span>
+      <div style="flex:1; height:5px; background:var(--surface-2); border-radius:3px; overflow:hidden;">
+        <div style="height:100%; width:${pct}%; background:${colors[i%6]}; transition:width 0.5s;"></div>
+      </div>
+      <span style="color:var(--text-muted); min-width:30px; text-align:right;">${pct}%</span>
+    </div>`;
+  }).join('');
+  // Hot path: top tool trong tool_tally
+  const toolTally = snapshot.tool_tally || {};
+  const topTool = Object.entries(toolTally).sort((a,b) => b[1] - a[1])[0];
+  if (topTool) {
+    hotEl.innerHTML = `<i class="ti ti-flame" style="color: var(--orange);"></i> hot path: ${sorted[0][0]} → ${topTool[0]}`;
+  }
+}
+
 function renderKinds() {
   const total = Object.values(state.kindTally).reduce((a,b) => a+b, 0);
   if (total === 0) return;
@@ -770,6 +921,29 @@ function renderEvent(ev) {
   // Enhancement 1: age older rows (fade out)
   ageTimelineRows();
 
+  // Bash command tracking với runtime detection
+  if (ev.kind === 'tool_use' && ev.name === 'Bash') {
+    const cmd = ev.payload?.summary || '';
+    const rt = detectRuntime(cmd);
+    const entry = {
+      ts: ev.ts, cmd: cmd, runtime: rt,
+      background: !!ev.payload?.in_background,
+      status: 'running', duration: null,
+      tool_use_id: ev.payload?.tool_use_id,
+    };
+    recentCmds.push(entry);
+    while (recentCmds.length > 60) recentCmds.shift();
+    if (entry.tool_use_id) pendingCmds.set(entry.tool_use_id, entry);
+    renderCmds();
+  }
+  if (ev.kind === 'tool_result' && ev.payload?.tool_use_id && pendingCmds.has(ev.payload.tool_use_id)) {
+    const entry = pendingCmds.get(ev.payload.tool_use_id);
+    entry.status = ev.status || 'success';
+    entry.duration = ev.duration;
+    pendingCmds.delete(ev.payload.tool_use_id);
+    renderCmds();
+  }
+
   // File edits tracking — add vào recentEdits khi tool_use có file_path/summary
   if (ev.kind === 'tool_use' && EDIT_TOOLS.includes(ev.name)) {
     const entry = {
@@ -873,7 +1047,11 @@ async function loadSnapshot() {
     document.getElementById('sess-id').textContent = s.session_id ? s.session_id.slice(0, 8) : '—';
     state.startedAt = s.started_at;
     state.lastSessionId = s.session_id;
+    state.counters = s.counters;
+    state.context = s.context;
     updateCounters(s.counters, s.context);
+    renderAgentTree(s);
+    renderSkills(s);
     document.getElementById('timeline').innerHTML = '';
     state.kindTally = {};
     s.events.slice(-50).forEach(renderEvent);
@@ -915,6 +1093,8 @@ function connect() {
       state.counters = s.counters;
       state.context = s.context;
       updateCounters(s.counters, s.context);
+      renderAgentTree(s);
+      renderSkills(s);
       // Session switch detect
       if (state.lastSessionId && s.session_id !== state.lastSessionId) {
         document.getElementById('session-name').textContent = s.session_id.slice(0, 8);
@@ -1046,11 +1226,12 @@ async function loadInventory() {
         const icon = s.live ? 'ti ti-player-play-filled' : (s.recent ? 'ti ti-circle-dot-filled' : 'ti ti-circle');
         const projShort = s.project.replace(/^D--Projects-/, '').slice(0, 24);
         const pinned = state.pinnedSessionId === s.id ? ' pinned' : '';
-        return `<div class="sess-row ${cls}${pinned}" data-id="${s.id}" title="click để pin dashboard theo dõi · ${s.id}">
+        return `<div class="sess-row ${cls}${pinned}" data-id="${s.id}" title="click để pin · ${s.id}">
           <span class="sess-num">${i + 1}.</span>
           <i class="${icon} sess-icon ${cls}"></i>
           <span class="sess-id">${s.name}<span class="project">${projShort}</span></span>
           <span class="sess-meta">${fmtAge(s.age_s)}</span>
+          <span class="sess-resume" data-resume="${s.id}" title="copy lệnh: claude --resume ${s.id}">⤴</span>
         </div>`;
       }).join('') +
       (inv.telegram.installed ? `<div class="sess-tg"><i class="ti ti-brand-telegram"></i><span>Telegram bot: <b style="color: var(--text-primary);">${inv.telegram.bot}</b> · gateway plugin installed · ${inv.telegram.note}</span></div>` : '');
@@ -1091,6 +1272,28 @@ async function unpinSession() {
   } catch (e) { console.error(e); }
 }
 document.getElementById('pin-badge').addEventListener('click', unpinSession);
+
+// Resume button click → copy clipboard
+document.addEventListener('click', async (e) => {
+  const resumeBtn = e.target.closest('.sess-resume[data-resume]');
+  if (resumeBtn) {
+    e.stopPropagation();
+    const sid = resumeBtn.dataset.resume;
+    const cmd = `claude --resume ${sid}`;
+    try {
+      await navigator.clipboard.writeText(cmd);
+      const orig = resumeBtn.textContent;
+      resumeBtn.textContent = '✓';
+      resumeBtn.classList.add('copied');
+      resumeBtn.title = 'copied: ' + cmd;
+      setTimeout(() => { resumeBtn.textContent = orig; resumeBtn.classList.remove('copied'); resumeBtn.title = 'copy lệnh: ' + cmd; }, 1500);
+    } catch (err) {
+      // Fallback: show prompt
+      prompt('Copy lệnh:', cmd);
+    }
+    return;
+  }
+});
 
 // Click session row → pin dashboard theo dõi session đó
 document.addEventListener('click', async (e) => {

@@ -161,11 +161,23 @@ def _parse_assistant(obj: dict, ts: float, eid: str | None) -> list[dict]:
             tool_id = block.get("id", "")
             tool_input = block.get("input", {}) or {}
             summary = _summarize_tool_input(tool_name, tool_input)
+            # Extract metadata quan trọng cho tracking
+            meta: dict = {}
+            if tool_name == "Bash":
+                meta["in_background"] = bool(tool_input.get("run_in_background"))
+            if tool_name == "Agent":
+                meta["subagent_type"] = tool_input.get("subagent_type") or "general"
+                meta["agent_name"] = tool_input.get("name") or tool_input.get("description", "")[:30]
+            if tool_name == "Skill":
+                meta["skill"] = tool_input.get("skill", "")
+            payload = {"tool_use_id": tool_id, "summary": summary,
+                       "input_keys": list(tool_input.keys())[:5], **meta}
+            if usage_summary:
+                payload["usage"] = usage_summary
             events.append(_norm(
                 KIND_TOOL_USE, tool_name,
                 status="running",
-                payload={"tool_use_id": tool_id, "summary": summary, "input_keys": list(tool_input.keys())[:5],
-                         "usage": usage_summary} if usage_summary else {"tool_use_id": tool_id, "summary": summary, "input_keys": list(tool_input.keys())[:5]},
+                payload=payload,
                 ts=ts, event_id=tool_id[:8] if tool_id else eid,
             ))
         elif btype == "text":

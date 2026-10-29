@@ -104,8 +104,8 @@ def _extract_session_name(jsonl: Path) -> str | None:
     return None
 
 
-def list_active_sessions(limit: int = 20, window_s: int = 7200) -> list[dict]:
-    """List Claude Code sessions có activity trong window (default 2h).
+def list_active_sessions(limit: int = 30, window_s: int = 604800) -> list[dict]:
+    """List Claude Code sessions có activity trong window (default 7 ngày).
 
     Returns sorted by mtime desc, each with name từ custom-title event.
     """
