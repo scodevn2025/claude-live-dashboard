@@ -178,7 +178,7 @@ def _parse_assistant(obj: dict, ts: float, eid: str | None) -> list[dict]:
                 KIND_TOOL_USE, tool_name,
                 status="running",
                 payload=payload,
-                ts=ts, event_id=tool_id[:8] if tool_id else eid,
+                ts=ts, event_id=tool_id or eid,  # bug #2: full id không truncate 8 chars (collision)
             ))
         elif btype == "text":
             text_chars += len(block.get("text", ""))

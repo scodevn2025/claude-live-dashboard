@@ -46,13 +46,24 @@ def list_sessions() -> list[Path]:
 
 
 def _read_new_lines(path: Path, offset: int) -> tuple[list[dict], int]:
-    """Read all lines from offset, return (parsed objects, new offset)."""
+    """Read COMPLETE lines từ offset, giữ partial tail cho lần đọc sau (bug #1).
+
+    Chỉ advance offset tới newline cuối cùng — partial line không bị skip.
+    """
     objs: list[dict] = []
     try:
         with open(path, "rb") as f:
             f.seek(offset)
-            for line in f:
-                offset += len(line)
+            buf = f.read()
+            if not buf:
+                return objs, offset
+            last_nl = buf.rfind(b"\n")
+            if last_nl < 0:
+                # Chưa có line hoàn chỉnh nào — giữ offset nguyên
+                return objs, offset
+            complete = buf[:last_nl + 1]
+            offset += len(complete)
+            for line in complete.splitlines():
                 stripped = line.strip()
                 if not stripped:
                     continue

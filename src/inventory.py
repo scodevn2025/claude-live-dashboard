@@ -36,27 +36,43 @@ def list_skills() -> list[dict]:
 
 
 def list_plugins() -> list[dict]:
-    """Scan ~/.claude/plugins/installed_plugins.json."""
+    """Scan ~/.claude/plugins/installed_plugins.json.
+
+    Schema v2 Claude Code (bug #3):
+      {"version": 2, "plugins": {"<name>@<marketplace>": [{"scope","installPath","version","installedAt","gitCommitSha"}]}}
+    """
     installed = CLAUDE_HOME / "plugins" / "installed_plugins.json"
     if not installed.exists():
         return []
     try:
         data = orjson.loads(installed.read_bytes())
-        if isinstance(data, dict):
-            # Format: {"plugin-name": {...meta...}}
-            out = []
-            for name, meta in data.items():
-                out.append({
-                    "name": name,
-                    "version": (meta or {}).get("version", ""),
-                    "marketplace": (meta or {}).get("marketplace", ""),
-                })
-            return out
-        if isinstance(data, list):
-            return [{"name": p.get("name", "?"), "version": p.get("version", "")} for p in data]
+        if not isinstance(data, dict):
+            return []
+        plugins = data.get("plugins", {})
+        if not isinstance(plugins, dict):
+            return []
+        out = []
+        for key, entries in plugins.items():
+            # Split "name@marketplace"
+            if "@" in key:
+                name, marketplace = key.split("@", 1)
+            else:
+                name, marketplace = key, ""
+            # Entries là list, lấy first (latest install)
+            entry = {}
+            if isinstance(entries, list) and entries:
+                entry = entries[0] if isinstance(entries[0], dict) else {}
+            elif isinstance(entries, dict):
+                entry = entries
+            out.append({
+                "name": name,
+                "version": entry.get("version", ""),
+                "marketplace": marketplace,
+                "scope": entry.get("scope", "user"),
+            })
+        return out
     except Exception:
-        pass
-    return []
+        return []
 
 
 def list_mcp_servers() -> list[dict]:

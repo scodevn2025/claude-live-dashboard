@@ -22,45 +22,63 @@ state = SessionState(max_events=300)
 subscribers: set[asyncio.Queue] = set()
 
 
-async def _consume_session() -> None:
-    """Background task: tail session hiện pinned (nếu có) hoặc active.
+dropped_events: int = 0
 
-    - Nếu state.pinned_session_file set → tail file đó, catch-up từ đầu.
-    - Nếu không → tail session active (newest mtime), auto-switch khi file mới xuất hiện.
-    """
+
+async def _tail_dispatch(sess: Path, start_offset: int) -> None:
+    """Tail file + dispatch events qua SSE queues. Raise khi session cần switch."""
+    global dropped_events
+    async for raw in tail_file(sess, start_offset=start_offset):
+        # Bug #4: check pin thường xuyên để react nhanh
+        if state.pinned_session_file and state.pinned_session_file != str(sess):
+            return
+        if not state.pinned_session_file:
+            current = find_active_session()
+            if current and current != sess and current.stat().st_mtime > sess.stat().st_mtime + 5:
+                return
+        for ev in parse_event(raw):
+            state.apply(ev)
+            payload = orjson.dumps(ev).decode()
+            for q in list(subscribers):
+                try:
+                    q.put_nowait(payload)
+                except asyncio.QueueFull:
+                    # Bug #5: log drop thay vì silent suppress
+                    dropped_events += 1
+                    print(f"[sse] dropped event (queue full), total dropped: {dropped_events}")
+
+
+async def _consume_session() -> None:
+    """Background task: tail session + reactively switch khi pin đổi (bug #4)."""
     while True:
         if state.pinned_session_file:
             sess = Path(state.pinned_session_file)
             if not sess.exists():
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
                 continue
-            # Pin mode: catch-up from offset 0 để load full history
-            start_offset = 0
+            start_offset = 0  # Pin mode: load full history
         else:
             sess = find_active_session()
             if not sess:
                 await asyncio.sleep(2)
                 continue
-            # Auto mode: skip existing content, chỉ bắt event mới
             start_offset = sess.stat().st_size
 
         state.reset_session(str(sess), sess.stem)
         try:
-            async for raw in tail_file(sess, start_offset=start_offset):
-                # Nếu user pin session khác → restart loop
-                if state.pinned_session_file and state.pinned_session_file != str(sess):
-                    break
-                # Nếu auto mode và có session newer → switch
-                if not state.pinned_session_file:
-                    current = find_active_session()
-                    if current and current != sess and current.stat().st_mtime > sess.stat().st_mtime + 5:
+            # Wrap trong task để cancel được khi pin đổi (bug #4 race fix)
+            dispatch_task = asyncio.create_task(_tail_dispatch(sess, start_offset))
+            while not dispatch_task.done():
+                await asyncio.sleep(1)
+                # Pin đổi → cancel dispatch + loop lại
+                if state.pinned_session_file != (str(sess) if state.pinned_session_file else None):
+                    if state.pinned_session_file != str(sess):
+                        dispatch_task.cancel()
+                        with contextlib.suppress(asyncio.CancelledError, Exception):
+                            await dispatch_task
                         break
-                for ev in parse_event(raw):
-                    state.apply(ev)
-                    payload = orjson.dumps(ev).decode()
-                    for q in list(subscribers):
-                        with contextlib.suppress(asyncio.QueueFull):
-                            q.put_nowait(payload)
+            else:
+                await dispatch_task  # retrieve result or exception
         except Exception as e:
             print(f"[watcher] error: {e}, restarting in 3s")
             await asyncio.sleep(3)

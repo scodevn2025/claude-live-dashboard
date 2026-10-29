@@ -559,6 +559,14 @@ const KIND_LABEL = {
 let state = { counters: {}, startedAt: Date.now() / 1000, kindTally: {}, ctxTokens: 0, ctxMax: 200000, loops: [] };
 let evTimes = [];
 let activeTools = 0;
+
+// Bug #8: HTML escape để chặn XSS từ event payload (cmd/file text)
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Bug #6: track rendered event IDs để tránh duplicate render
+const renderedIds = new Set();
 // Track file edit operations realtime
 const EDIT_TOOLS = ['Write', 'Edit', 'Read', 'Grep', 'Glob'];
 const recentEdits = []; // {ts, name, file, duration, status}
@@ -594,12 +602,12 @@ function renderCmds() {
     const bgBadge = c.background ? '<span class="bg-badge">bg</span>' : '';
     const timeStr = new Date(c.ts * 1000).toTimeString().slice(0,8);
     const dur = isLive ? '…' : (c.duration ? c.duration.toFixed(1) + 's' : '');
-    return `<div class="cmd-row ${cls}" title="${(c.cmd||'').replace(/"/g,'&quot;')}">
-      <span class="cmd-time">${timeStr}</span>
-      <i class="ti ${runtimeIcon(c.runtime)} cmd-rt-icon ${c.runtime}"></i>
-      <span class="cmd-rt ${c.runtime}">${c.runtime}</span>
-      <span class="cmd-text">${bgBadge}${(c.cmd||'').slice(0, 120)}</span>
-      <span class="cmd-dur ${isLive ? 'live' : ''}">${dur}</span>
+    return `<div class="cmd-row ${cls}" title="${esc(c.cmd)}">
+      <span class="cmd-time">${esc(timeStr)}</span>
+      <i class="ti ${runtimeIcon(c.runtime)} cmd-rt-icon ${esc(c.runtime)}"></i>
+      <span class="cmd-rt ${esc(c.runtime)}">${esc(c.runtime)}</span>
+      <span class="cmd-text">${bgBadge}${esc((c.cmd||'').slice(0, 120))}</span>
+      <span class="cmd-dur ${isLive ? 'live' : ''}">${esc(dur)}</span>
     </div>`;
   }).join('');
 }
@@ -621,12 +629,12 @@ function renderEdits() {
     const parts = fileDisplay.split(/[\\/]/);
     const base = parts[parts.length - 1];
     const dir = parts.length > 1 ? parts.slice(-3, -1).join('/') + '/' : '';
-    return `<div class="edit-row ${cls}" title="${e.file || ''}">
-      <span class="edit-time">${timeStr}</span>
-      <i class="ti ${icon} edit-icon ${e.name}"></i>
-      <span class="edit-op ${e.name}">${e.name}</span>
-      <span class="edit-file"><b>${base}</b><span class="path"> · ${dir}</span></span>
-      <span class="edit-dur ${isLive ? 'running' : ''}">${dur}</span>
+    return `<div class="edit-row ${cls}" title="${esc(e.file)}">
+      <span class="edit-time">${esc(timeStr)}</span>
+      <i class="ti ${icon} edit-icon ${esc(e.name)}"></i>
+      <span class="edit-op ${esc(e.name)}">${esc(e.name)}</span>
+      <span class="edit-file"><b>${esc(base)}</b><span class="path"> · ${esc(dir)}</span></span>
+      <span class="edit-dur ${isLive ? 'running' : ''}">${esc(dur)}</span>
     </div>`;
   }).join('');
 }
@@ -883,6 +891,16 @@ function pulseNode(nodeId, color) {
 }
 
 function renderEvent(ev) {
+  // Bug #6: skip duplicate render (bootstrap_replay)
+  if (ev.id && renderedIds.has(ev.id)) return;
+  if (ev.id) {
+    renderedIds.add(ev.id);
+    if (renderedIds.size > 500) {
+      // Prune old IDs
+      const arr = Array.from(renderedIds);
+      arr.slice(0, 200).forEach(id => renderedIds.delete(id));
+    }
+  }
   // Count kind
   state.kindTally[ev.kind] = (state.kindTally[ev.kind] || 0) + 1;
 
@@ -1059,8 +1077,14 @@ async function loadSnapshot() {
 }
 
 let reconnectAttempts = 0;
+let snapshotRefreshTimer = null;  // Bug #7: clear interval cũ khi reconnect
+let currentES = null;
 function connect() {
+  // Bug #7: cleanup previous interval + EventSource
+  if (snapshotRefreshTimer) { clearInterval(snapshotRefreshTimer); snapshotRefreshTimer = null; }
+  if (currentES) { try { currentES.close(); } catch (e) {} currentES = null; }
   const es = new EventSource('/api/events');
+  currentES = es;
   es.addEventListener('open', () => {
     document.getElementById('conn-dot').className = 'dot';
     document.getElementById('conn-text').textContent = 'kết nối SSE OK';
@@ -1074,9 +1098,9 @@ function connect() {
       updateCounters(state.counters, state.context);
     } catch (err) { console.error(err); }
   });
-  es.addEventListener('snapshot', (e) => {
-    try { renderEvent(JSON.parse(e.data)); } catch (err) {}
-  });
+  // Bug #6: skip snapshot replay — loadSnapshot() đã populate initial events
+  // SSE 'snapshot' events duplicate với snapshot API call → ignore
+  es.addEventListener('snapshot', (e) => { /* intentionally ignored */ });
   es.addEventListener('error', () => {
     document.getElementById('conn-dot').className = 'dot red';
     document.getElementById('conn-text').textContent = 'mất kết nối — reconnect…';
@@ -1086,7 +1110,7 @@ function connect() {
     setTimeout(() => connect(), delay);
   });
   // Periodic snapshot refresh (counters + context + detect session switch)
-  const refreshTimer = setInterval(async () => {
+  snapshotRefreshTimer = setInterval(async () => {
     try {
       const r = await fetch('/api/snapshot');
       const s = await r.json();
@@ -1102,11 +1126,13 @@ function connect() {
         document.getElementById('timeline').innerHTML = '';
         state.lastSessionId = s.session_id;
         state.kindTally = {};
+        renderedIds.clear();  // bug #6: reset dedup set
         resetCompliance();
         recentEdits.length = 0; pendingEdits.clear(); renderEdits();
+        recentCmds.length = 0; pendingCmds.clear(); renderCmds();
         gsap.fromTo('.card', { opacity: 0.3 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
       }
-    } catch (e) { clearInterval(refreshTimer); }
+    } catch (e) { clearInterval(snapshotRefreshTimer); snapshotRefreshTimer = null; }
   }, 3000);
 }
 
@@ -1297,6 +1323,8 @@ document.addEventListener('click', async (e) => {
 
 // Click session row → pin dashboard theo dõi session đó
 document.addEventListener('click', async (e) => {
+  // Bug #9: skip khi click resume button (handler riêng ở trên)
+  if (e.target.closest('.sess-resume')) return;
   const row = e.target.closest('.sess-row[data-id]');
   if (!row) return;
   const sid = row.dataset.id;
