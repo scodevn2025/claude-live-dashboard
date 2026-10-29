@@ -92,7 +92,10 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .kinds-legend .sw { width: 8px; height: 8px; border-radius: 2px; }
 
 .pipeline { background: linear-gradient(180deg, var(--surface-1), var(--surface-0)); border: 0.5px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-top: 12px; position: relative; overflow: hidden; }
-.pipeline svg { width: 100%; height: 220px; }
+.pipeline svg { width: 1280px; height: 240px; display: block; min-width: 1280px; }
+.pipeline-scroll { overflow-x: auto; overflow-y: hidden; }
+.pipeline-scroll::-webkit-scrollbar { height: 6px; }
+.pipeline-scroll::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
 .pipeline-head { display: flex; justify-content: space-between; margin-bottom: 10px; }
 
 .node-rect { fill: var(--surface-2); stroke-width: 1.5; }
@@ -157,6 +160,7 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
     <span id="conn-text">kết nối SSE…</span>
     <span style="color: var(--text-muted);">·</span>
     <span id="sess-id" style="color: var(--text-primary);">—</span>
+    <span id="pin-badge" style="display:none; margin-left: 10px; padding: 2px 10px; background: rgba(226,117,36,0.2); color: #ff8451; border-radius: 10px; font-size: 11px; cursor: pointer;" title="click để unpin về auto mode">📍 pinned · click để unpin</span>
   </div>
   <div class="topbar-right">
     <span><b id="uptime">00:00:00</b> uptime</span>
@@ -329,10 +333,33 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 
 <div class="pipeline">
   <div class="pipeline-head">
-    <div class="lbl">pipeline · live flow</div>
+    <div class="lbl">pipeline · live flow <span style="color: var(--text-muted); font-weight: 400; margin-left: 6px;">· quy trình bắt buộc</span></div>
     <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="pipe-info">waiting for events…</div>
   </div>
-  <svg id="pipeline-svg" viewBox="0 0 1280 220" preserveAspectRatio="xMidYMid meet">
+  <!-- Compliance checklist bar — mỗi session phải đi đủ 5 stage -->
+  <div id="pipeline-compliance" style="display: flex; align-items: center; gap: 10px; margin: 8px 0 14px; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; font-size: 11px; font-family: 'JetBrains Mono', monospace;">
+    <span style="color: var(--text-muted);">compliance</span>
+    <div style="display: flex; gap: 8px; flex: 1;">
+      <div class="comp-pill" data-stage="think"><i class="ti ti-brain"></i> think</div>
+      <div class="comp-pill" data-stage="tool"><i class="ti ti-tool"></i> tool</div>
+      <div class="comp-pill" data-stage="review"><i class="ti ti-search"></i> review</div>
+      <div class="comp-pill" data-stage="debug"><i class="ti ti-bug"></i> debug</div>
+      <div class="comp-pill" data-stage="verify"><i class="ti ti-check"></i> verify</div>
+      <div class="comp-pill" data-stage="test"><i class="ti ti-test-pipe"></i> test</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="width: 80px; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden;"><div id="comp-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ff5c5a, #ffb547, #22d19a); transition: width 0.6s ease-out;"></div></div>
+      <span><b id="comp-score" style="color: var(--text-primary);">0</b>/6</span>
+    </div>
+  </div>
+<style>
+.comp-pill { padding: 3px 10px; background: var(--surface-3); color: var(--text-muted); border-radius: 10px; opacity: 0.5; transition: all 0.4s; display: flex; align-items: center; gap: 4px; }
+.comp-pill.done { background: rgba(34,209,154,0.2); color: var(--green); opacity: 1; font-weight: 500; }
+.comp-pill.done::after { content: '✓'; margin-left: 4px; color: var(--green); font-weight: bold; }
+.comp-pill i { font-size: 12px; }
+</style>
+  <div class="pipeline-scroll">
+  <svg id="pipeline-svg" viewBox="0 0 1280 240">
     <defs>
       <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9b9ba3"/></marker>
       <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
@@ -444,6 +471,7 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
       <g id="particles"></g>
     </g>
   </svg>
+  </div>
 </div>
 
 <div class="footer">
@@ -767,6 +795,7 @@ function renderEvent(ev) {
   const stage = classifyStage(ev);
   if (stage) {
     emitStageParticle(stage);
+    markCompliance(stage);
     if (['review','debug','verify','test'].includes(stage)) updateStageNode(stage);
     if (stage === 'think') {
       const el = document.getElementById('n-think-tokens');
@@ -774,6 +803,8 @@ function renderEvent(ev) {
       if (el) el.textContent = (t >= 1000 ? (t/1000).toFixed(1) + 'k' : t) + ' tok';
     }
   }
+  // Mark tool compliance mỗi khi có tool_use
+  if (ev.kind === 'tool_use') markCompliance('tool');
 
   // Pipeline reactions
   if (ev.kind === 'tool_use') {
@@ -891,6 +922,8 @@ function connect() {
         document.getElementById('timeline').innerHTML = '';
         state.lastSessionId = s.session_id;
         state.kindTally = {};
+        resetCompliance();
+        recentEdits.length = 0; pendingEdits.clear(); renderEdits();
         gsap.fromTo('.card', { opacity: 0.3 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
       }
     } catch (e) { clearInterval(refreshTimer); }
@@ -911,6 +944,30 @@ gsap.from('.card', { opacity: 0, y: 20, duration: 0.6, stagger: 0.08, ease: 'pow
 gsap.from('.pipeline', { opacity: 0, y: 20, duration: 0.8, delay: 0.3, ease: 'power3.out' });
 gsap.from('#pipeline-svg g[id^="node"]', { opacity: 0, y: 20, duration: 0.6, stagger: 0.08, delay: 0.3, ease: 'back.out(1.4)' });
 gsap.from('#pipeline-svg .edge', { opacity: 0, duration: 0.8, stagger: 0.1, delay: 0.6, ease: 'power2.out' });
+
+// Compliance tracker — mỗi session phải đi qua các stage
+const complianceStages = new Set();  // reset khi session change
+function markCompliance(stage) {
+  if (!['think','tool','review','debug','verify','test'].includes(stage)) return;
+  if (complianceStages.has(stage)) return;
+  complianceStages.add(stage);
+  const pill = document.querySelector(`.comp-pill[data-stage="${stage}"]`);
+  if (pill) {
+    pill.classList.add('done');
+    gsap.fromTo(pill, {scale: 0.8, backgroundColor: 'rgba(34,209,154,0.6)'},
+      {scale: 1, backgroundColor: '', duration: 0.6, ease: 'back.out(1.6)'});
+  }
+  // Update score
+  const score = complianceStages.size;
+  document.getElementById('comp-score').textContent = score;
+  document.getElementById('comp-fill').style.width = (score / 6 * 100) + '%';
+}
+function resetCompliance() {
+  complianceStages.clear();
+  document.querySelectorAll('.comp-pill').forEach(p => p.classList.remove('done'));
+  document.getElementById('comp-score').textContent = '0';
+  document.getElementById('comp-fill').style.width = '0%';
+}
 
 // Flow stage classifier — detect review/debug/verify/test từ tool payload
 const stageStats = { review: 0, debug: 0, verify: 0, test: 0, think: 0, loop: 1 };
@@ -1023,6 +1080,18 @@ loadInventory();
 // Refresh sessions + inventory mỗi 5s (lightweight)
 setInterval(loadInventory, 5000);
 
+async function unpinSession() {
+  try {
+    await fetch('/api/pin-session', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({clear:true})});
+    state.pinnedSessionId = null;
+    document.getElementById('pin-badge').style.display = 'none';
+    document.getElementById('timeline').innerHTML = '';
+    recentEdits.length = 0; pendingEdits.clear(); renderEdits();
+    setTimeout(() => { loadInventory(); loadSnapshot(); }, 500);
+  } catch (e) { console.error(e); }
+}
+document.getElementById('pin-badge').addEventListener('click', unpinSession);
+
 // Click session row → pin dashboard theo dõi session đó
 document.addEventListener('click', async (e) => {
   const row = e.target.closest('.sess-row[data-id]');
@@ -1038,6 +1107,14 @@ document.addEventListener('click', async (e) => {
     const resp = await r.json();
     if (resp.ok) {
       state.pinnedSessionId = isPinned ? null : sid;
+      const badge = document.getElementById('pin-badge');
+      if (state.pinnedSessionId) {
+        badge.style.display = 'inline-block';
+        gsap.from(badge, {scale: 0, duration: 0.4, ease: 'back.out(1.6)'});
+      } else {
+        badge.style.display = 'none';
+      }
+      resetCompliance();
       // Reset timeline + reload
       document.getElementById('timeline').innerHTML = '';
       state.kindTally = {};
@@ -1076,6 +1153,26 @@ renderEvent = function(ev) {
     }
   }
 };
+
+// Reorder sections: pipeline lên UP, inventory + sessions + edits xuống DOWN
+(function reorder() {
+  const wrap = document.querySelector('.wrap');
+  const pipeline = document.querySelector('.pipeline');
+  if (wrap && pipeline) {
+    // Find các card secondary (edits, sessions, inventory) — 3 card ngay trước pipeline
+    const cards = wrap.querySelectorAll('.card[style*="margin-bottom"]');
+    const secondaryCards = Array.from(cards).filter(c => {
+      const lbl = c.querySelector('.lbl')?.textContent || '';
+      return lbl.includes('file edits') || lbl.includes('sessions') || lbl.includes('inventory');
+    });
+    // Move pipeline lên trước secondary cards
+    const firstSecondary = secondaryCards[0];
+    if (firstSecondary) wrap.insertBefore(pipeline, firstSecondary);
+    // Move footer xuống cuối (sau các secondary cards)
+    const footer = wrap.querySelector('.footer');
+    if (footer) wrap.appendChild(footer);
+  }
+})();
 
 loadSnapshot().then(connect);
 
