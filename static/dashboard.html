@@ -301,6 +301,19 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .cmd-text .bg-badge { background: rgba(255,181,71,0.2); color: var(--amber); padding: 1px 6px; border-radius: 8px; font-size: 9px; margin-right: 6px; font-weight: 500; }
 .cmd-dur { color: var(--text-muted); font-size: 10px; font-style: italic; }
 .cmd-dur.live { color: var(--accent); animation: pulse 1.4s ease-in-out infinite; font-weight: 500; }
+.cmd-row-wrap { margin-bottom: 2px; }
+.cmd-row.expandable { cursor: pointer; }
+.cmd-row.expandable::after { content: '▸'; color: var(--text-muted); font-size: 10px; margin-left: 4px; transition: transform 0.2s; }
+.cmd-row.expandable.open::after { transform: rotate(90deg); display: inline-block; }
+.cmd-output {
+  display: none; margin: 4px 10px 8px; padding: 10px 12px;
+  background: #0a0a0d; border-left: 2px solid var(--accent); border-radius: 0 6px 6px 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 1.5;
+  color: var(--text-secondary); white-space: pre-wrap; max-height: 300px; overflow-y: auto;
+}
+.cmd-row.open + .cmd-output { display: block; }
+.cmd-output::-webkit-scrollbar { width: 4px; }
+.cmd-output::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
 
 /* Diff-based update: flash yellow khi field thay đổi, không re-render toàn bộ */
 @keyframes fieldFlash {
@@ -631,9 +644,20 @@ function runtimeIcon(rt) {
           node:'ti-brand-nodejs', git:'ti-brand-git', other:'ti-terminal'}[rt] || 'ti-terminal-2';
 }
 
+const openCmdIds = new Set();
+// Capture open state trước khi re-render
+function captureOpenCmds() {
+  openCmdIds.clear();
+  document.querySelectorAll('.cmd-row.open[data-cmdid]').forEach(el => {
+    const id = el.dataset.cmdid;
+    if (id) openCmdIds.add(id);
+  });
+}
+
 function renderCmds() {
   const list = document.getElementById('cmds-list');
   if (!list) return;
+  captureOpenCmds();  // preserve expand state
   document.getElementById('cmds-count').textContent = `${recentCmds.length} cmds · ${pendingCmds.size} đang chạy`;
   if (recentCmds.length === 0) { return; }
   const items = recentCmds.slice(-30).reverse();
@@ -643,12 +667,18 @@ function renderCmds() {
     const bgBadge = c.background ? '<span class="bg-badge">bg</span>' : '';
     const timeStr = new Date(c.ts * 1000).toTimeString().slice(0,8);
     const dur = isLive ? '…' : (c.duration ? c.duration.toFixed(1) + 's' : '');
-    return `<div class="cmd-row ${cls}" title="${esc(c.cmd)}">
-      <span class="cmd-time">${esc(timeStr)}</span>
-      <i class="ti ${runtimeIcon(c.runtime)} cmd-rt-icon ${esc(c.runtime)}"></i>
-      <span class="cmd-rt ${esc(c.runtime)}">${esc(c.runtime)}</span>
-      <span class="cmd-text">${bgBadge}${esc((c.cmd||'').slice(0, 120))}</span>
-      <span class="cmd-dur ${isLive ? 'live' : ''}">${esc(dur)}</span>
+    const hasOutput = c.output && c.output.length > 0;
+    const outputPreview = hasOutput ? `<pre class="cmd-output">${esc(c.output)}</pre>` : '';
+    const isOpen = openCmdIds.has(c.tool_use_id);
+    return `<div class="cmd-row-wrap">
+      <div class="cmd-row ${cls}${hasOutput ? ' expandable' : ''}${isOpen ? ' open' : ''}" title="${esc(c.cmd)}" data-cmdid="${esc(c.tool_use_id || '')}">
+        <span class="cmd-time">${esc(timeStr)}</span>
+        <i class="ti ${runtimeIcon(c.runtime)} cmd-rt-icon ${esc(c.runtime)}"></i>
+        <span class="cmd-rt ${esc(c.runtime)}">${esc(c.runtime)}</span>
+        <span class="cmd-text">${bgBadge}${esc((c.cmd||'').slice(0, 120))}</span>
+        <span class="cmd-dur ${isLive ? 'live' : ''}">${esc(dur)}</span>
+      </div>
+      ${outputPreview}
     </div>`;
   }).join('');
 }
@@ -999,6 +1029,7 @@ function renderEvent(ev) {
     const entry = pendingCmds.get(ev.payload.tool_use_id);
     entry.status = ev.status || 'success';
     entry.duration = ev.duration;
+    entry.output = ev.payload?.output || '';
     pendingCmds.delete(ev.payload.tool_use_id);
     renderCmds();
   }
@@ -1474,6 +1505,14 @@ async function unpinSession() {
   } catch (e) { console.error(e); }
 }
 document.getElementById('pin-badge').addEventListener('click', unpinSession);
+
+// Click cmd-row expandable → toggle output expand
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('.cmd-row.expandable');
+  if (row) {
+    row.classList.toggle('open');
+  }
+});
 
 // Resume button click → copy clipboard
 document.addEventListener('click', async (e) => {

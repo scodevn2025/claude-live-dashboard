@@ -112,10 +112,22 @@ def _parse_user(obj: dict, ts: float, eid: str | None) -> list[dict]:
             if btype == "tool_result":
                 tool_id = block.get("tool_use_id", "")
                 is_error = block.get("is_error", False)
+                # Extract output content preview (first 2000 chars)
+                raw_content = block.get("content")
+                output_text = ""
+                if isinstance(raw_content, str):
+                    output_text = raw_content
+                elif isinstance(raw_content, list):
+                    for part in raw_content:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            output_text += part.get("text", "")
+                        elif isinstance(part, str):
+                            output_text += part
+                output_preview = output_text[:2000] if output_text else ""
                 events.append(_norm(
-                    KIND_TOOL_RESULT, tool_id[:8],
+                    KIND_TOOL_RESULT, tool_id,
                     status="error" if is_error else "success",
-                    payload={"tool_use_id": tool_id, "is_error": is_error},
+                    payload={"tool_use_id": tool_id, "is_error": is_error, "output": output_preview},
                     ts=ts, event_id=eid,
                 ))
             elif btype == "text":
