@@ -1,21 +1,49 @@
 @echo off
 REM Launcher claude-live-dashboard — ba double-click là chạy
-REM 1. Kick uvicorn daemon ở background
-REM 2. Mở trình duyệt mặc định
+REM 1. Start uvicorn backend 127.0.0.1:8765 (nếu chưa chạy)
+REM 2. Start cloudflared tunnel → dashboard.scodevn.tech (nếu chưa chạy)
+REM 3. Mở browser URL public (fallback local nếu tunnel down)
 
 cd /d "%~dp0"
-
-echo [*] Starting dashboard daemon on http://127.0.0.1:8765...
-start "claude-live-dashboard" /B cmd /c "uv run python -X utf8 -m uvicorn src.main:app --host 127.0.0.1 --port 8765 --log-level warning"
-
-echo [*] Waiting for server ready...
-timeout /t 3 /nobreak >nul
-
-echo [*] Opening browser...
-start "" "http://127.0.0.1:8765/dashboard"
+chcp 65001 >nul
 
 echo.
-echo [+] Dashboard running. Keep this window open.
-echo [+] Press Ctrl+C or close this window to stop daemon.
+echo === Claude Live Dashboard launcher ===
 echo.
-pause >nul
+
+REM --- Backend check ---
+curl -s -o nul -w "%%{http_code}" http://127.0.0.1:8765/api/health > "%TEMP%\cld_health.txt" 2>nul
+set /p HEALTH=<"%TEMP%\cld_health.txt"
+del "%TEMP%\cld_health.txt" >nul 2>&1
+
+if "%HEALTH%"=="200" (
+  echo [=] Backend already running on :8765
+) else (
+  echo [+] Starting uvicorn backend on :8765...
+  start "claude-live-dashboard · backend" /min cmd /c "uv run python -X utf8 -m uvicorn src.main:app --host 127.0.0.1 --port 8765 --log-level warning"
+  timeout /t 3 /nobreak >nul
+)
+
+REM --- Tunnel check (process name) ---
+tasklist /FI "IMAGENAME eq cloudflared.exe" 2>nul | find /i "cloudflared.exe" >nul
+if %ERRORLEVEL% EQU 0 (
+  echo [=] Cloudflared tunnel already running
+) else (
+  echo [+] Starting cloudflared tunnel claude-dashboard...
+  start "claude-live-dashboard · tunnel" /min cmd /c "bin\cloudflared.exe tunnel run claude-dashboard"
+  timeout /t 4 /nobreak >nul
+)
+
+echo.
+echo [OK] Dashboard URLs:
+echo      Public:  https://dashboard.scodevn.tech/dashboard
+echo      Local:   http://127.0.0.1:8765/dashboard
+echo.
+echo [*] Opening browser (public URL)...
+start "" "https://dashboard.scodevn.tech/dashboard"
+
+echo.
+echo [+] Backend + tunnel chạy nền (minimized trong taskbar).
+echo [+] Đóng cửa sổ này không stop. Dùng stop.bat hoặc kill process.
+echo.
+timeout /t 2 /nobreak >nul

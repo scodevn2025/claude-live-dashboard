@@ -6,3 +6,5 @@ __pycache__/
 *.log
 uv.lock
 .DS_Store
+bin/
+*.lnk
