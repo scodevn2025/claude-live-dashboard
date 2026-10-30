@@ -62,7 +62,9 @@ async def _consume_session() -> None:
             if not sess:
                 await asyncio.sleep(2)
                 continue
-            start_offset = sess.stat().st_size
+            # Catch-up 500KB cuối để seed recent_thinkings + counters + edit history
+            # (thay vì skip toàn bộ existing content)
+            start_offset = max(0, sess.stat().st_size - 500_000)
 
         state.reset_session(str(sess), sess.stem)
         try:
