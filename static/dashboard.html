@@ -5,6 +5,9 @@
 <title>Claude Live · Astra Pipeline</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
 <style>
 :root {
   --bg: #0a0a0d;
@@ -92,11 +95,12 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .kinds-legend .sw { width: 8px; height: 8px; border-radius: 2px; }
 
 .pipeline { background: linear-gradient(180deg, var(--surface-1), var(--surface-0)); border: 0.5px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-top: 12px; position: relative; overflow: hidden; }
-.pipeline svg { width: 1280px; height: 240px; display: block; min-width: 1280px; }
-.pipeline-scroll { overflow-x: auto; overflow-y: hidden; }
-.pipeline-scroll::-webkit-scrollbar { height: 6px; }
-.pipeline-scroll::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
 .pipeline-head { display: flex; justify-content: space-between; margin-bottom: 10px; }
+#pipeline-3d { width: 100%; height: 300px; position: relative; background: radial-gradient(ellipse at center, rgba(74,158,255,0.04), transparent 60%); border-radius: 10px; overflow: hidden; cursor: grab; }
+#pipeline-3d:active { cursor: grabbing; }
+#pipeline-3d canvas { display: block; }
+#pipeline-3d .pipeline-fallback { display: none; padding: 60px 20px; text-align: center; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+#pipeline-3d .p3d-hint { position: absolute; bottom: 6px; right: 10px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); opacity: 0.5; pointer-events: none; z-index: 2; }
 
 .node-rect { fill: var(--surface-2); stroke-width: 1.5; }
 .node-rect.active { fill: var(--accent-dim); }
@@ -464,119 +468,9 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .comp-pill.done::after { content: '✓'; margin-left: 4px; color: var(--green); font-weight: bold; }
 .comp-pill i { font-size: 12px; }
 </style>
-  <div class="pipeline-scroll">
-  <svg id="pipeline-svg" viewBox="0 0 1280 240">
-    <defs>
-      <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9b9ba3"/></marker>
-      <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#4a9eff" stop-opacity="0.1"/>
-        <stop offset="50%" stop-color="#4a9eff" stop-opacity="1"/>
-        <stop offset="100%" stop-color="#22d19a" stop-opacity="0.1"/>
-      </linearGradient>
-    </defs>
-    <g font-family="'JetBrains Mono', monospace" font-size="12" fill="#ececec">
-      <!-- Row 1 (y=55): ba → claude → think → tool bus -->
-      <!-- Row 2 (y=130): tool bus → review ↔ debug ↔ verify ↔ test → result -->
-      <!-- Row 3 (y=200): subagents + background below -->
-
-      <!-- Node ba (user input) -->
-      <g id="node-user" transform="translate(50, 55)">
-        <circle r="28" class="node-rect" stroke="#4a9eff"/>
-        <text y="-2" text-anchor="middle" font-weight="500" font-size="11">ba</text>
-        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3">prompt</text>
-      </g>
-      <!-- Claude main -->
-      <g id="node-claude" transform="translate(200, 55)">
-        <rect x="-60" y="-26" width="120" height="52" rx="10" class="node-rect active" stroke="#4a9eff"/>
-        <text y="-6" text-anchor="middle" font-weight="500" font-size="11" fill="#4a9eff">claude main</text>
-        <text y="8" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-claude-sub">harness</text>
-        <text y="20" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-claude-turns">0 turns</text>
-      </g>
-      <!-- Think -->
-      <g id="node-think" transform="translate(380, 55)">
-        <rect x="-55" y="-24" width="110" height="48" rx="24" class="node-rect" stroke="#a287f4"/>
-        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#a287f4">💭 thinking</text>
-        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-think-tokens">0 tok</text>
-      </g>
-      <!-- Tool bus -->
-      <g id="node-tool" transform="translate(560, 55)">
-        <rect x="-70" y="-26" width="140" height="52" rx="10" class="node-rect" stroke="#4a9eff"/>
-        <text y="-6" text-anchor="middle" font-weight="500" font-size="11" fill="#4a9eff" id="n-tool-name">tool bus</text>
-        <text y="8" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-tool-sub">idle</text>
-        <text y="20" text-anchor="middle" font-size="8" fill="#6a6a73" id="n-tool-count">0 calls</text>
-      </g>
-      <!-- Review -->
-      <g id="node-review" transform="translate(760, 55)">
-        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#ffb547"/>
-        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#ffb547">🔍 review</text>
-        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-review">pending</text>
-      </g>
-      <!-- Debug -->
-      <g id="node-debug" transform="translate(900, 55)">
-        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#ff5c5a"/>
-        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#ff5c5a">🐞 debug</text>
-        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-debug">0 errors</text>
-      </g>
-      <!-- Verify -->
-      <g id="node-verify" transform="translate(1040, 55)">
-        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#4ad9e4"/>
-        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#4ad9e4">✓ verify</text>
-        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-verify">0 pass</text>
-      </g>
-      <!-- Test -->
-      <g id="node-test" transform="translate(1180, 55)">
-        <rect x="-50" y="-22" width="100" height="44" rx="8" class="node-rect" stroke="#22d19a"/>
-        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#22d19a">🧪 test</text>
-        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-test">0 run</text>
-      </g>
-      <!-- Subagents -->
-      <g id="node-agent" transform="translate(560, 160)">
-        <rect x="-60" y="-20" width="120" height="40" rx="8" class="node-rect" stroke="#f58cb5"/>
-        <text y="-2" text-anchor="middle" font-size="10" fill="#f58cb5">👥 subagents</text>
-        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-agent-count">0 spawned</text>
-      </g>
-      <!-- Background tasks -->
-      <g id="node-bg" transform="translate(740, 160)">
-        <rect x="-60" y="-20" width="120" height="40" rx="8" class="node-rect" stroke="#ffb547"/>
-        <text y="-2" text-anchor="middle" font-size="10" fill="#ffb547">⚙ background</text>
-        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-bg-count">0 running</text>
-      </g>
-      <!-- Loops -->
-      <g id="node-loops" transform="translate(920, 160)">
-        <rect x="-60" y="-20" width="120" height="40" rx="8" class="node-rect" stroke="#a287f4"/>
-        <text y="-2" text-anchor="middle" font-size="10" fill="#a287f4">↻ loops/cron</text>
-        <text y="12" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-loops">1 watch</text>
-      </g>
-      <!-- Result → user -->
-      <g id="node-result" transform="translate(1180, 160)">
-        <rect x="-55" y="-22" width="110" height="44" rx="8" class="node-rect" stroke="#22d19a"/>
-        <text y="-4" text-anchor="middle" font-weight="500" font-size="11" fill="#22d19a">→ ba</text>
-        <text y="10" text-anchor="middle" font-size="8" fill="#9b9ba3" id="n-result-sub">answer</text>
-      </g>
-
-      <!-- Main flow edges (top row) -->
-      <path id="edge-u-c" d="M78,55 L140,55" class="edge" stroke="#4a4a55" />
-      <path id="edge-c-think" d="M260,55 L325,55" class="edge" stroke="#4a4a55" />
-      <path id="edge-think-t" d="M435,55 L490,55" class="edge" stroke="#4a4a55" />
-      <path id="edge-c-t" d="M260,55 Q440,20 490,55" class="edge" stroke="#2c3a4c" opacity="0.5" />
-      <path id="edge-t-review" d="M630,55 L710,55" class="edge" stroke="#4a4a55" />
-      <path id="edge-review-debug" d="M810,55 L850,55" class="edge" stroke="#4a4a55" />
-      <path id="edge-debug-verify" d="M950,55 L990,55" class="edge" stroke="#4a4a55" />
-      <path id="edge-verify-test" d="M1090,55 L1130,55" class="edge" stroke="#4a4a55" />
-      <!-- Loop back: debug → tool bus (nếu test fail) -->
-      <path id="edge-loop-back" d="M900,77 Q900,140 740,140 Q500,140 560,77" class="edge" stroke="#ff5c5a" stroke-dasharray="4,3" opacity="0.4" />
-      <!-- Vertical: tool → subagents / bg -->
-      <path id="edge-t-a" d="M560,81 L560,140" class="edge" stroke="#4a4a55" />
-      <path id="edge-t-b" d="M560,81 Q650,100 740,140" class="edge" stroke="#4a4a55" />
-      <path id="edge-t-loops" d="M560,81 Q740,100 920,140" class="edge" stroke="#4a4a55" />
-      <!-- Test → Result → ba -->
-      <path id="edge-test-r" d="M1180,77 L1180,138" class="edge" stroke="#4a4a55" />
-      <path id="edge-t-r" d="M560,81 Q900,180 1125,160" class="edge" stroke="#2c3a4c" opacity="0.4" />
-
-      <!-- Particles layer -->
-      <g id="particles"></g>
-    </g>
-  </svg>
+  <div id="pipeline-3d">
+    <div class="pipeline-fallback">WebGL cần thiết để render pipeline 3D. Trình duyệt chưa hỗ trợ hoặc GPU đã tắt.</div>
+    <div class="p3d-hint">drag · xoay · scroll zoom</div>
   </div>
 </div>
 
@@ -822,11 +716,12 @@ function updateCounters(c, ctx) {
     if (tl) tl.textContent = fmtK(ctx.thinking_last || 0);
     if (tt) tt.textContent = fmtK(ctx.thinking_total || 0);
   }
-  // Update pipeline node counters
-  document.getElementById('n-claude-turns').textContent = (c.assistant_turns || 0) + ' turns';
-  document.getElementById('n-tool-count').textContent = (c.tool_calls || 0) + ' calls';
-  document.getElementById('n-agent-count').textContent = (c.agents_spawned || 0) + ' spawned';
-  document.getElementById('n-result-count').textContent = ((c.tool_calls || 0) - (c.errors || 0)) + ' ok';
+  // Update pipeline node counters (3D labels may mount after first call → guard)
+  const setLbl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  setLbl('n-claude-turns', (c.assistant_turns || 0) + ' turns');
+  setLbl('n-tool-count', (c.tool_calls || 0) + ' calls');
+  setLbl('n-agent-count', (c.agents_spawned || 0) + ' spawned');
+  setLbl('n-result-count', ((c.tool_calls || 0) - (c.errors || 0)) + ' ok');
   state.counters = c;
 }
 
@@ -1672,6 +1567,321 @@ setInterval(() => {
     updateContextTokens(est, 200000);
   }
 }, 2000);
+</script>
+
+<!-- v12: Three.js 3D pipeline — replaces SVG, overrides pulseNode/emitParticle/sustainToolNode -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const container = document.getElementById('pipeline-3d');
+const fallback = container?.querySelector('.pipeline-fallback');
+
+// WebGL probe
+let webglOk = true;
+try {
+  const c = document.createElement('canvas');
+  const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+  if (!gl) webglOk = false;
+} catch (e) { webglOk = false; }
+
+if (!webglOk || !container) {
+  if (fallback) fallback.style.display = 'block';
+  console.warn('[pipeline-3d] WebGL unavailable — fallback shown');
+} else {
+  initPipeline3D();
+}
+
+function initPipeline3D() {
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0a0a0d, 18, 55);
+
+  const w0 = container.clientWidth, h0 = container.clientHeight || 300;
+  const camera = new THREE.PerspectiveCamera(50, w0 / h0, 0.1, 100);
+  camera.position.set(0, 4.5, 13);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w0, h0);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+
+  // CSS2D label renderer (overlay)
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(w0, h0);
+  labelRenderer.domElement.style.position = 'absolute';
+  labelRenderer.domElement.style.top = '0';
+  labelRenderer.domElement.style.left = '0';
+  labelRenderer.domElement.style.pointerEvents = 'none';
+  container.appendChild(labelRenderer.domElement);
+
+  // RoomEnvironment for soft reflections
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+  } catch (e) { console.warn('[pipeline-3d] PMREM failed, continue sans env', e); }
+
+  // Lights — cinematic key + fill
+  scene.add(new THREE.AmbientLight(0x404060, 0.4));
+  const key = new THREE.PointLight(0x4a9eff, 1.0, 25);
+  key.position.set(0, 5, 6);
+  scene.add(key);
+  const fill = new THREE.PointLight(0x22d19a, 0.6, 20);
+  fill.position.set(6, -2, 4);
+  scene.add(fill);
+  const rim = new THREE.PointLight(0xa287f4, 0.4, 18);
+  rim.position.set(-6, 3, -2);
+  scene.add(rim);
+
+  // --- Nodes ---
+  const nodes = {};
+
+  function makeLabel(cfg) {
+    const el = document.createElement('div');
+    el.style.cssText = 'font-family:"JetBrains Mono", monospace; text-align:center; pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,0.8); white-space:nowrap; transform:translateY(-6px);';
+    const t = document.createElement('div');
+    t.style.cssText = `color:${cfg.titleColor}; font-weight:600; font-size:11px;`;
+    t.textContent = cfg.title;
+    if (cfg.titleId) t.id = cfg.titleId;
+    el.appendChild(t);
+    if (cfg.subId || cfg.sub != null) {
+      const s = document.createElement('div');
+      if (cfg.subId) s.id = cfg.subId;
+      s.style.cssText = 'color:#9b9ba3; font-size:9px; margin-top:2px;';
+      s.textContent = cfg.sub || '';
+      el.appendChild(s);
+    }
+    if (cfg.extraId) {
+      const x = document.createElement('div');
+      x.id = cfg.extraId;
+      x.style.cssText = 'color:#6a6a73; font-size:8px;';
+      x.textContent = cfg.extra || '';
+      el.appendChild(x);
+    }
+    return new CSS2DObject(el);
+  }
+
+  function makeNode(id, geo, hex, pos, labelCfg) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a24,
+      emissive: new THREE.Color(hex),
+      emissiveIntensity: 0.55,
+      roughness: 0.3,
+      metalness: 0.55,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(...pos);
+    mesh.userData = { baseEmissive: 0.55, hex };
+    scene.add(mesh);
+
+    if (labelCfg) {
+      const label = makeLabel(labelCfg);
+      const bbox = new THREE.Box3().setFromObject(mesh);
+      const size = bbox.getSize(new THREE.Vector3());
+      label.position.set(0, size.y / 2 + 0.5, 0);
+      mesh.add(label);
+    }
+    nodes[id] = mesh;
+    return mesh;
+  }
+
+  // Geometries
+  const sphereGeo = new THREE.SphereGeometry(0.55, 24, 16);
+  const toolGeo = new THREE.BoxGeometry(1.8, 0.9, 0.5);
+  const claudeGeo = new THREE.BoxGeometry(1.6, 0.9, 0.5);
+  const smallGeo = new THREE.BoxGeometry(1.2, 0.65, 0.4);
+  const subGeo = new THREE.BoxGeometry(1.5, 0.55, 0.4);
+  const resultGeo = new THREE.BoxGeometry(1.4, 0.65, 0.4);
+  const knotGeo = new THREE.TorusKnotGeometry(0.38, 0.11, 56, 10);
+  const torusGeo = new THREE.TorusGeometry(0.45, 0.14, 14, 32);
+
+  // Layout: X spread across linear flow
+  makeNode('node-user',   sphereGeo, 0x4a9eff, [-10, 1.8, 0],    { title: 'ba', sub: 'prompt', titleColor: '#4a9eff' });
+  makeNode('node-claude', claudeGeo, 0x4a9eff, [-7.3, 1.8, 0],   { title: 'claude main', subId: 'n-claude-sub', sub: 'harness', extraId: 'n-claude-turns', extra: '0 turns', titleColor: '#4a9eff' });
+  makeNode('node-think',  knotGeo,   0xa287f4, [-4.8, 1.8, 0],   { title: '💭 thinking', subId: 'n-think-tokens', sub: '0 tok', titleColor: '#a287f4' });
+  makeNode('node-tool',   toolGeo,   0x4a9eff, [-2.3, 1.8, 0],   { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' });
+  makeNode('node-review', smallGeo,  0xffb547, [0.3, 1.8, 0],    { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' });
+  makeNode('node-debug',  smallGeo,  0xff5c5a, [2.7, 1.8, 0],    { title: '🐞 debug', subId: 'n-debug', sub: '0 errors', titleColor: '#ff5c5a' });
+  makeNode('node-verify', smallGeo,  0x4ad9e4, [5.1, 1.8, 0],    { title: '✓ verify', subId: 'n-verify', sub: '0 pass', titleColor: '#4ad9e4' });
+  makeNode('node-test',   smallGeo,  0x22d19a, [7.5, 1.8, 0],    { title: '🧪 test', subId: 'n-test', sub: '0 run', titleColor: '#22d19a' });
+  makeNode('node-agent',  subGeo,    0xf58cb5, [-2.3, -2.3, 1.2],{ title: '👥 subagents', subId: 'n-agent-count', sub: '0 spawned', titleColor: '#f58cb5' });
+  makeNode('node-bg',     subGeo,    0xffb547, [0.3, -2.3, 1.2], { title: '⚙ background', subId: 'n-bg-count', sub: '0 running', titleColor: '#ffb547' });
+  makeNode('node-loops',  torusGeo,  0xa287f4, [2.7, -2.3, 1.2], { title: '↻ loops', subId: 'n-loops', sub: '1 watch', titleColor: '#a287f4' });
+  makeNode('node-result', resultGeo, 0x22d19a, [7.5, -2.3, 0],   { title: '→ ba', subId: 'n-result-sub', sub: 'answer', titleColor: '#22d19a' });
+
+  // --- Edges ---
+  const edges = {};
+  function addEdge(id, fromId, toId, opts = {}) {
+    const nf = nodes[fromId], nt = nodes[toId];
+    if (!nf || !nt) return;
+    const from = nf.position.clone(), to = nt.position.clone();
+    let points;
+    if (opts.curve) {
+      const mid = new THREE.Vector3((from.x + to.x) / 2, (from.y + to.y) / 2 + (opts.curveY ?? 1.0), (from.z + to.z) / 2 + (opts.curveZ ?? 0));
+      points = [from, mid, to];
+    } else {
+      points = [from, to];
+    }
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(opts.segments || 40));
+    const mat = new THREE.LineBasicMaterial({
+      color: opts.color || 0x4a4a55,
+      transparent: true,
+      opacity: opts.opacity ?? 0.55,
+    });
+    const line = new THREE.Line(geo, mat);
+    scene.add(line);
+    edges[id] = { line, curve, baseColor: opts.color || 0x4a4a55, baseOpacity: opts.opacity ?? 0.55 };
+  }
+
+  // Main flow
+  addEdge('edge-u-c',         'node-user',   'node-claude');
+  addEdge('edge-c-think',     'node-claude', 'node-think');
+  addEdge('edge-think-t',     'node-think',  'node-tool');
+  addEdge('edge-c-t',         'node-claude', 'node-tool',   { curve: true, curveY: 1.6, opacity: 0.25 });
+  addEdge('edge-t-review',    'node-tool',   'node-review');
+  addEdge('edge-review-debug','node-review', 'node-debug');
+  addEdge('edge-debug-verify','node-debug',  'node-verify');
+  addEdge('edge-verify-test', 'node-verify', 'node-test');
+  // Side (tool → subagents/bg/loops)
+  addEdge('edge-t-a',         'node-tool',   'node-agent',  { curve: true, curveY: -0.4, curveZ: 0.6 });
+  addEdge('edge-t-b',         'node-tool',   'node-bg',     { curve: true, curveY: -0.6, curveZ: 0.6 });
+  addEdge('edge-t-loops',     'node-tool',   'node-loops',  { curve: true, curveY: -0.8, curveZ: 0.6 });
+  // Result + loop back
+  addEdge('edge-test-r',      'node-test',   'node-result');
+  addEdge('edge-t-r',         'node-tool',   'node-result', { curve: true, curveY: -2.2, curveZ: 0.4, opacity: 0.3 });
+  addEdge('edge-loop-back',   'node-debug',  'node-tool',   { curve: true, curveY: 2.5, color: 0xff5c5a, opacity: 0.4 });
+  addEdge('edge-r-u',         'node-result', 'node-user',   { curve: true, curveY: -3.0, color: 0x22d19a, opacity: 0.3 });
+
+  // --- OrbitControls ---
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.autoRotate = false;
+  controls.enableZoom = true;
+  controls.enablePan = false;
+  controls.minDistance = 7;
+  controls.maxDistance = 28;
+  controls.maxPolarAngle = Math.PI * 0.75;
+  controls.target.set(0, 0, 0);
+
+  // --- Resize ---
+  function onResize() {
+    const w = container.clientWidth, h = container.clientHeight || 300;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    labelRenderer.setSize(w, h);
+  }
+  window.addEventListener('resize', onResize);
+  // Also observe container size changes
+  if (window.ResizeObserver) new ResizeObserver(onResize).observe(container);
+
+  // --- Animation loop ---
+  const spinSet = ['node-think', 'node-loops'];
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    // Emissive decay toward baseEmissive
+    for (const id in nodes) {
+      const m = nodes[id];
+      const base = m.userData.baseEmissive;
+      if (m.material.emissiveIntensity > base) {
+        m.material.emissiveIntensity = Math.max(base, m.material.emissiveIntensity - 0.04);
+      }
+      if (spinSet.includes(id)) {
+        m.rotation.y += 0.018;
+        m.rotation.x += 0.009;
+      }
+    }
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+  }
+  animate();
+
+  // Entrance anim via GSAP
+  if (window.gsap) {
+    const meshes = Object.values(nodes);
+    meshes.forEach(m => { m.scale.set(0.01, 0.01, 0.01); });
+    gsap.to(meshes.map(m => m.scale), { x: 1, y: 1, z: 1, duration: 0.7, stagger: 0.06, ease: 'back.out(1.5)', delay: 0.2 });
+  }
+
+  // --- Hook overrides for existing dashboard code ---
+  // Script scope function declarations in dashboard.html's main <script> are attached to window
+  // (plain script, no "use strict", no type="module"), so we can reassign.
+
+  window.pulseNode = function(nodeId, colorStr) {
+    const m = nodes[nodeId];
+    if (!m) return;
+    const c = new THREE.Color(colorStr || '#4a9eff');
+    m.material.emissive.copy(c);
+    m.material.emissiveIntensity = 2.4;
+    if (window.gsap) {
+      gsap.fromTo(m.scale, { x: 1, y: 1, z: 1 }, { x: 1.35, y: 1.35, z: 1.35, duration: 0.28, yoyo: true, repeat: 1, ease: 'power2.out', overwrite: true });
+    }
+  };
+
+  const particleGeo = new THREE.SphereGeometry(0.15, 12, 8);
+  window.emitParticle = function(edgeId, colorStr) {
+    const edge = edges[edgeId];
+    if (!edge) return;
+    const col = new THREE.Color(colorStr || '#4a9eff');
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x111115,
+      emissive: col,
+      emissiveIntensity: 2.4,
+      roughness: 0.1,
+      metalness: 0.3,
+      transparent: true,
+      opacity: 0.95,
+    });
+    const p = new THREE.Mesh(particleGeo, mat);
+    scene.add(p);
+    // Edge flash
+    const line = edge.line;
+    const origCol = edge.baseColor, origOp = edge.baseOpacity;
+    line.material.color.set(col);
+    line.material.opacity = Math.min(1, origOp + 0.4);
+    const state = { t: 0 };
+    if (window.gsap) {
+      gsap.to(line.material, { opacity: origOp, duration: 1.1, ease: 'power2.out', onComplete: () => line.material.color.set(origCol) });
+      gsap.to(state, {
+        t: 1,
+        duration: 0.95,
+        ease: 'power1.inOut',
+        onUpdate: () => {
+          const pt = edge.curve.getPoint(state.t);
+          p.position.copy(pt);
+          mat.emissiveIntensity = 2.4 * (1 - Math.abs(state.t - 0.5) * 0.5);
+        },
+        onComplete: () => {
+          scene.remove(p);
+          mat.dispose();
+        }
+      });
+    } else {
+      scene.remove(p);
+      mat.dispose();
+    }
+  };
+
+  window.sustainToolNode = function(on) {
+    const m = nodes['node-tool'];
+    if (!m) return;
+    m.userData.baseEmissive = on ? 1.6 : 0.55;
+    if (m.material.emissiveIntensity < m.userData.baseEmissive) {
+      m.material.emissiveIntensity = m.userData.baseEmissive;
+    }
+  };
+
+  console.log('[pipeline-3d] ready — 12 nodes · 15 edges · fog + ACES tonemap · RoomEnvironment');
+}
 </script>
 </body>
 </html>
