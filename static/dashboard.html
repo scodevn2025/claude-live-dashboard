@@ -463,6 +463,18 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
   </div>
 </div>
 
+<!-- v19: context breakdown 3D stacked bar (mirror /context command) -->
+<div class="card" id="context-breakdown-card">
+  <div class="panel-head">
+    <div class="lbl"><i class="ti ti-stack-2" style="color: var(--violet);"></i> context breakdown · token allocation</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="ctx-bd-total">0 / 200k</div>
+  </div>
+  <div id="context-3d" style="height: 280px; position: relative; background: radial-gradient(ellipse at center, rgba(162,135,244,0.04), transparent 60%); border-radius: 10px; overflow: hidden;">
+    <div class="pipeline-fallback" style="display:none; padding: 60px 20px; text-align:center; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 12px;">WebGL cần thiết</div>
+  </div>
+  <div id="ctx-bd-legend" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+</div>
+
 <div class="grid scene-grid">
   <div class="card">
     <div class="lbl">agent tree · spawn hierarchy</div>
@@ -1143,6 +1155,7 @@ async function loadSnapshot() {
     renderAgentTree(s);
     renderSkills(s);
     renderThinkings(s.thinking_recent || []);
+    if (window.updateContext3D && s.context_breakdown) window.updateContext3D(s.context_breakdown);
     document.getElementById('timeline').innerHTML = '';
     state.kindTally = {};
     s.events.slice(-50).forEach(renderEvent);
@@ -1193,6 +1206,7 @@ function connect() {
       renderAgentTree(s);
       renderSkills(s);
       renderThinkings(s.thinking_recent || []);
+      if (window.updateContext3D && s.context_breakdown) window.updateContext3D(s.context_breakdown);
       // Session switch detect
       if (state.lastSessionId && s.session_id !== state.lastSessionId) {
         document.getElementById('session-name').textContent = s.session_id.slice(0, 8);
@@ -1889,6 +1903,14 @@ function initPipeline3D() {
       g.add(arm);
       arms.push(arm);
     }
+    // Coffee mug prop (hidden; shown during 'coffee' action), parented to arms[1]
+    const mugMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2a, roughness: 0.7, metalness: 0.1 });
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 10), mugMat);
+    // Place at tip of arm (arm is length 0.85 along local Y, so tip at local y=-0.42)
+    mug.position.set(0, -0.48, 0);
+    mug.rotation.x = Math.PI / 2;
+    mug.visible = false;
+    arms[1].add(mug);
     if (isHuman) {
       const crown = new THREE.Mesh(
         new THREE.CylinderGeometry(0.3, 0.26, 0.16, 6, 1, true),
@@ -1898,7 +1920,7 @@ function initPipeline3D() {
       g.add(crown);
     }
     g.scale.setScalar(scale);
-    return { group: g, body, head, bulb, bulbMat, arms, visor, visorMat };
+    return { group: g, body, head, bulb, bulbMat, arms, mug, visor, visorMat };
   }
 
   // Desk + monitor glow
@@ -2051,7 +2073,7 @@ function initPipeline3D() {
     ceo:    makeRoom(-9,   -0.3, 3.2, 3.2, 0xecc970, 'phòng giám đốc'),
     claude: makeRoom(-4,   -0.3, 5.8, 3.2, 0xd9734a, 'studio claude'),
     dev:    makeRoom( 1.5, -0.3, 5.4, 3.2, 0xff5c5a, 'phòng dev · debug'),
-    test:   makeRoom( 6.5, -0.3, 3.6, 3.2, 0x4ad9e4, 'phòng verify · test'),
+    test:   makeRoom( 7,   -0.3, 4.4, 3.2, 0x4ad9e4, 'phòng verify · test'),
     sub:    makeRoom( 0,    3.0, 7.6, 2.8, 0xf58cb5, 'khu subagent · codex'),
   };
 
@@ -2068,15 +2090,15 @@ function initPipeline3D() {
   const cDesk = makeDesk(-5.5, 0.4, { screenHex: 0x4a9eff });
   scene.add(cDesk.group); decor.desks.push(cDesk);
   scene.add(makeChair(-5.5, -0.5, Math.PI));
-  const toolDesk = makeDesk(-2.3, 0.4, { screenHex: 0xa287f4 });
+  const toolDesk = makeDesk(-3.5, 0.4, { screenHex: 0xa287f4 });
   scene.add(toolDesk.group); decor.desks.push(toolDesk);
-  scene.add(makeChair(-2.3, -0.5, Math.PI));
+  scene.add(makeChair(-3.5, -0.5, Math.PI));
   scene.add(makePlant(-6.5, 0.5, 0.75));
 
-  // Phòng Dev · Debug: review + debug desks + rack
-  const revDesk = makeDesk(0.3, 0.4, { screenHex: 0xffb547 });
+  // Phòng Dev · Debug: review + debug desks + rack (spread 3.0 unit để tránh label overlap)
+  const revDesk = makeDesk(-0.5, 0.4, { screenHex: 0xffb547 });
   scene.add(revDesk.group); decor.desks.push(revDesk);
-  const dbgDesk = makeDesk(2.7, 0.4, { screenHex: 0xff5c5a });
+  const dbgDesk = makeDesk(2.5, 0.4, { screenHex: 0xff5c5a });
   scene.add(dbgDesk.group); decor.desks.push(dbgDesk);
   const devRack = makeRack(4.0, 0.5, 0xff5c5a);
   scene.add(devRack.group); decor.racks.push(devRack);
@@ -2084,9 +2106,9 @@ function initPipeline3D() {
   // Phòng Verify · Test: 2 desks + plant
   const verDesk = makeDesk(5.5, 0.4, { screenHex: 0x4ad9e4 });
   scene.add(verDesk.group); decor.desks.push(verDesk);
-  const tstDesk = makeDesk(7.5, 0.4, { screenHex: 0x22d19a });
+  const tstDesk = makeDesk(8.5, 0.4, { screenHex: 0x22d19a });
   scene.add(tstDesk.group); decor.desks.push(tstDesk);
-  scene.add(makePlant(8.1, 0.5, 0.75));
+  scene.add(makePlant(9.1, 0.5, 0.75));
 
   // Khu subagent (sub-row behind): 3 desks + codex rack
   for (const sx of [-2.3, 0.3, 2.7]) {
@@ -2233,12 +2255,12 @@ function initPipeline3D() {
   makeRobotNode('node-claude', 0x4a9eff, [-5.5, 0, -0.1], { title: 'claude main', subId: 'n-claude-sub', sub: 'harness', extraId: 'n-claude-turns', extra: '0 turns', titleColor: '#4a9eff' }, { scale: 1.2 });
   // Think orb floats above claude
   makeNode('node-think',  knotGeo,   0xa287f4, [-5.5, 2.9, -0.1], { title: '💭 thinking', subId: 'n-think-tokens', sub: '0 tok', titleColor: '#a287f4' });
-  // Worker robots: tool bus + review + debug + verify + test (humanoid scale 0.85)
-  makeRobotNode('node-tool',   0x4a9eff, [-2.3, 0, -0.1], { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' }, { scale: 0.85 });
-  makeRobotNode('node-review', 0xffb547, [0.3,  0, -0.1], { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' }, { scale: 0.85 });
-  makeRobotNode('node-debug',  0xff5c5a, [2.7,  0, -0.1], { title: '🐞 debug',  subId: 'n-debug',  sub: '0 errors', titleColor: '#ff5c5a' }, { scale: 0.85 });
+  // Worker robots: tool bus + review + debug + verify + test (humanoid scale 0.85) — spread 3.0 unit, labels không dính
+  makeRobotNode('node-tool',   0x4a9eff, [-3.5, 0, -0.1], { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' }, { scale: 0.85 });
+  makeRobotNode('node-review', 0xffb547, [-0.5, 0, -0.1], { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' }, { scale: 0.85 });
+  makeRobotNode('node-debug',  0xff5c5a, [2.5,  0, -0.1], { title: '🐞 debug',  subId: 'n-debug',  sub: '0 errors', titleColor: '#ff5c5a' }, { scale: 0.85 });
   makeRobotNode('node-verify', 0x4ad9e4, [5.5,  0, -0.1], { title: '✓ verify', subId: 'n-verify', sub: '0 pass',   titleColor: '#4ad9e4' }, { scale: 0.85 });
-  makeRobotNode('node-test',   0x22d19a, [7.5,  0, -0.1], { title: '🧪 test',  subId: 'n-test',   sub: '0 run',    titleColor: '#22d19a' }, { scale: 0.85 });
+  makeRobotNode('node-test',   0x22d19a, [8.5,  0, -0.1], { title: '🧪 test',  subId: 'n-test',   sub: '0 run',    titleColor: '#22d19a' }, { scale: 0.85 });
   // Sub-row robots: subagents + background
   makeRobotNode('node-agent', 0xf58cb5, [-2.3, 0, 3.1], { title: '👥 subagents', subId: 'n-agent-count', sub: '0 spawned', titleColor: '#f58cb5' }, { scale: 0.9 });
   makeRobotNode('node-bg',    0xffb547, [0.3,  0, 3.1], { title: '⚙ background', subId: 'n-bg-count', sub: '0 running', titleColor: '#ffb547' }, { scale: 0.9 });
@@ -2378,16 +2400,20 @@ function initPipeline3D() {
         r.armBaseZ = [r.arms[0].rotation.z, r.arms[1].rotation.z];
         r.armBaseX = [r.arms[0].rotation.x, r.arms[1].rotation.x];
         r.headBaseX = r.head.rotation.x;
+        r.headBaseY = r.head.scale.y;
+        r.groupBaseRotX = r.group.rotation.x;
         r.nextActionAt = now + 2000 + Math.random() * 5000;
         r.currentAction = null;
         r.actionStart = 0;
         r.actionEnd = 0;
       }
       if (!r.currentAction && now >= r.nextActionAt) {
-        const choices = ['yawn', 'coffee', 'type', 'stretch', 'idle'];
+        const choices = ['yawn', 'coffee', 'type', 'stretch', 'sit', 'idle'];
         r.currentAction = choices[Math.floor(Math.random() * choices.length)];
         r.actionStart = now;
-        r.actionEnd = now + (r.currentAction === 'type' ? 2200 : 1500) + Math.random() * 600;
+        const durBase = (r.currentAction === 'type' || r.currentAction === 'sit') ? 2200 : 1500;
+        r.actionEnd = now + durBase + Math.random() * 600;
+        if (r.currentAction === 'coffee' && r.mug) r.mug.visible = true;
       }
       if (r.currentAction) {
         const span = Math.max(1, r.actionEnd - r.actionStart);
@@ -2397,26 +2423,40 @@ function initPipeline3D() {
           r.arms[0].rotation.z = r.armBaseZ[0] - 1.1 * ease;
           r.arms[1].rotation.z = r.armBaseZ[1] + 1.1 * ease;
           r.head.rotation.x = r.headBaseX - 0.3 * ease;
+          // Head Y scale boost (mouth open feel) + brighter bulb pulse
+          r.head.scale.y = r.headBaseY * (1 + 0.15 * ease);
         } else if (r.currentAction === 'coffee') {
+          // Lift arm to face + head tilt into mug
           r.arms[1].rotation.x = r.armBaseX[1] - 1.3 * ease;
           r.arms[1].rotation.z = r.armBaseZ[1] + 0.3 * ease;
-          r.head.rotation.x = r.headBaseX + 0.1 * ease;
+          r.head.rotation.x = r.headBaseX + 0.15 * ease;
         } else if (r.currentAction === 'type') {
-          const osc = Math.sin((now - r.actionStart) * 0.012) * 0.1;
-          r.arms[0].rotation.x = r.armBaseX[0] + 0.35 + osc;
-          r.arms[1].rotation.x = r.armBaseX[1] + 0.35 - osc;
+          // Bend arms down to desk + hands oscillate rapidly
+          const osc = Math.sin((now - r.actionStart) * 0.01) * 0.08;
+          r.arms[0].rotation.x = r.armBaseX[0] + 0.5 + osc;
+          r.arms[1].rotation.x = r.armBaseX[1] + 0.5 - osc;
+          r.arms[0].rotation.z = r.armBaseZ[0] + 0.15;
+          r.arms[1].rotation.z = r.armBaseZ[1] - 0.15;
         } else if (r.currentAction === 'stretch') {
           r.arms[0].rotation.z = r.armBaseZ[0] - 0.9 * ease;
           r.arms[1].rotation.z = r.armBaseZ[1] + 0.9 * ease;
+        } else if (r.currentAction === 'sit') {
+          // Bend knees — group.y shrink + slight forward lean
+          const bs = nodes[key].userData.baseScale || 1.1;
+          r.group.scale.y = bs * breathe * (1 - 0.15 * ease);
+          r.group.rotation.x = r.groupBaseRotX + 0.1 * ease;
         }
         if (now >= r.actionEnd) {
           r.currentAction = null;
-          r.nextActionAt = now + 3000 + Math.random() * 5500;
+          r.nextActionAt = now + 3000 + Math.random() * 6000;
           r.arms[0].rotation.z = r.armBaseZ[0];
           r.arms[1].rotation.z = r.armBaseZ[1];
           r.arms[0].rotation.x = r.armBaseX[0];
           r.arms[1].rotation.x = r.armBaseX[1];
           r.head.rotation.x = r.headBaseX;
+          r.head.scale.y = r.headBaseY;
+          r.group.rotation.x = r.groupBaseRotX;
+          if (r.mug) r.mug.visible = false;
         }
       }
     }
@@ -2560,7 +2600,7 @@ function initPipeline3D() {
     }
   };
 
-  console.log('[pipeline-3d] v18 ready — ' + Object.keys(nodes).length + ' nodes (' + Object.keys(robots).length + ' robot humanoid + parcel stack) · ' + Object.keys(edges).length + ' edges · 5 phòng · ' + decor.desks.length + ' desks · ' + decor.racks.length + ' racks · idle actions (yawn/coffee/type/stretch)');
+  console.log('[pipeline-3d] v19 ready — ' + Object.keys(nodes).length + ' nodes (' + Object.keys(robots).length + ' robot humanoid + parcel stack) · ' + Object.keys(edges).length + ' edges · 5 phòng · ' + decor.desks.length + ' desks · ' + decor.racks.length + ' racks · idle actions (yawn+head/coffee+mug/type+bend/stretch/sit) · 5 station spread 3.0u');
 }
 </script>
 
@@ -2580,12 +2620,15 @@ try {
 if (!webglOk) {
   document.querySelectorAll('.panel-3d-container').forEach(el => el.classList.add('webgl-off'));
   document.querySelectorAll('.panel-2d-fallback').forEach(el => el.classList.add('show-fallback'));
+  const ctxFallback = document.querySelector('#context-3d .pipeline-fallback');
+  if (ctxFallback) ctxFallback.style.display = 'block';
   console.warn('[panels-3d] WebGL unavailable — fallback 2D');
 } else {
   initAgentTree3D();
   initSkills3D();
   initKinds3D();
   initLoops3D();
+  initContext3D();
 }
 
 // Shared scene factory — các panel share pattern (lights + resize + ACES)
@@ -2938,7 +2981,106 @@ function initLoops3D() {
   animate();
 }
 
-console.log('[panels-3d] v13 ready — agent tree orbit · skills bars · kinds donut · loops rings');
+// ---- 5. Context breakdown 3D horizontal stacked bar (mirror /context command) ----
+function initContext3D() {
+  const c = document.getElementById('context-3d'); if (!c) return;
+  const { scene, camera, renderer, labelR } = makeScene(c, { cam: [0, 2.6, 7.5], fov: 42, fog: false });
+  camera.lookAt(0, 0.2, 0);
+
+  // Floor plane for shadow feel
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 2),
+    new THREE.MeshStandardMaterial({ color: 0x0e0e14, roughness: 0.9, metalness: 0.0 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.4;
+  scene.add(floor);
+
+  // Config: 10 categories (order = /context display)
+  // ponytail: hardcoded palette here mirrors backend keys; expand khi backend thêm bucket.
+  const CATS = [
+    { key: 'messages',               label: 'Messages',      hex: 0x4a9eff },
+    { key: 'memory_files',           label: 'Memory',        hex: 0xa287f4 },
+    { key: 'mcp_tools',              label: 'MCP Tools',     hex: 0x22d19a },
+    { key: 'system_prompt',          label: 'System Prompt', hex: 0xffb547 },
+    { key: 'system_tools',           label: 'System Tools',  hex: 0xff8c42 },
+    { key: 'skills',                 label: 'Skills',        hex: 0xf58cb5 },
+    { key: 'mcp_server_instructions',label: 'MCP Server',    hex: 0x4ad9e4 },
+    { key: 'custom_agents',          label: 'Agents',        hex: 0xecc970 },
+    { key: 'autocompact_buffer',     label: 'Autocompact',   hex: 0xffe066 },
+    { key: 'free',                   label: 'Free',          hex: 0x4a4a55 },
+  ];
+  const BAR_W = 11, BAR_H = 0.8, BAR_D = 0.6;
+  const segs = new Map(); // key → { mesh, label }
+  const legend = document.getElementById('ctx-bd-legend');
+  // Seed legend swatches
+  if (legend) {
+    legend.innerHTML = CATS.map(c => {
+      const hex = '#' + c.hex.toString(16).padStart(6, '0');
+      return `<span style="display:inline-flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${hex};"></span>${c.label}</span>`;
+    }).join('');
+  }
+
+  // Pre-create all segments (width=0 → animate when data lands)
+  const barGroup = new THREE.Group();
+  barGroup.position.set(-BAR_W / 2, 0, 0);
+  scene.add(barGroup);
+  for (const cat of CATS) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x151521, emissive: cat.hex, emissiveIntensity: 0.65,
+      roughness: 0.35, metalness: 0.5
+    });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.01, BAR_H, BAR_D), mat);
+    mesh.position.y = BAR_H / 2;
+    barGroup.add(mesh);
+    const el = document.createElement('div');
+    el.style.cssText = 'color:#ececec; font-family:"JetBrains Mono",monospace; font-size:9px; text-align:center; text-shadow:0 1px 2px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap; transform: translateY(-4px);';
+    const lab = new CSS2DObject(el);
+    lab.position.set(0, BAR_H + 0.25, 0);
+    mesh.add(lab);
+    segs.set(cat.key, { mesh, label: el, cat });
+  }
+
+  const totalEl = document.getElementById('ctx-bd-total');
+  window.updateContext3D = function(bd) {
+    if (!bd || !bd.total) return;
+    const total = bd.total;
+    let used = 0;
+    for (const cat of CATS) used += bd[cat.key] || 0;
+    // Normalize so sum = total (free is remainder — already computed in backend)
+    let cursor = 0;
+    for (const cat of CATS) {
+      const n = Math.max(0, bd[cat.key] || 0);
+      const w = Math.max(0.001, (n / total) * BAR_W);
+      const entry = segs.get(cat.key);
+      entry.mesh.geometry.dispose();
+      entry.mesh.geometry = new THREE.BoxGeometry(w, BAR_H, BAR_D);
+      entry.mesh.position.x = cursor + w / 2;
+      cursor += w;
+      // Only label significant segments (>3%) to avoid clutter
+      if (n / total > 0.03) {
+        entry.label.textContent = `${cat.label} · ${(n/1000).toFixed(1)}k`;
+      } else {
+        entry.label.textContent = '';
+      }
+    }
+    const usedK = (bd.total - (bd.free || 0)) / 1000;
+    const totalK = bd.total / 1000;
+    if (totalEl) totalEl.textContent = `${usedK.toFixed(1)}k / ${totalK.toFixed(0)}k · ${((1 - (bd.free || 0) / bd.total) * 100).toFixed(0)}% used`;
+  };
+
+  function animate() {
+    requestAnimationFrame(animate);
+    // Subtle sway for depth
+    barGroup.rotation.y = Math.sin(Date.now() * 0.0002) * 0.08;
+    renderer.render(scene, camera);
+    labelR.render(scene, camera);
+  }
+  animate();
+  console.log('[context-3d] v19 ready — ' + CATS.length + ' categories');
+}
+
+console.log('[panels-3d] v19 ready — agent tree orbit · skills bars · kinds donut · loops rings · context breakdown');
 </script>
 </body>
 </html>

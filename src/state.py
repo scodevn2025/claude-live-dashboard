@@ -147,6 +147,33 @@ class SessionState:
         elif kind == "agent_spawn":
             self.counters["agents_spawned"] += 1
 
+    def compute_context_breakdown(self) -> dict[str, int]:
+        """Approximation của /context: fixed overhead + messages dynamic.
+
+        ponytail: hardcoded fixed buckets, upgrade khi Claude Code expose structured usage.
+        """
+        total_cap = self.context.get("max_tokens", 200_000)
+        ctx_used = self.context.get("tokens", 0)
+        fixed = {
+            "memory_files": 23_000,
+            "mcp_tools": 18_700,
+            "system_prompt": 16_500,
+            "system_tools": 12_200,
+            "skills": 9_800,
+            "mcp_server_instructions": 9_300,
+            "custom_agents": 3_300,
+            "autocompact_buffer": 33_000,
+        }
+        fixed_sum = sum(fixed.values())
+        messages = max(0, ctx_used - fixed_sum)
+        free = max(0, total_cap - fixed_sum - messages)
+        return {
+            "messages": messages,
+            **fixed,
+            "free": free,
+            "total": total_cap,
+        }
+
     def snapshot(self) -> dict[str, Any]:
         """Full state cho /api/snapshot."""
         return {
@@ -157,6 +184,7 @@ class SessionState:
             "uptime_s": round(time.time() - self.started_at),
             "counters": dict(self.counters),
             "context": dict(self.context),
+            "context_breakdown": self.compute_context_breakdown(),
             "subagents": list(self.subagents),
             "bg_tasks": list(self.bg_tasks),
             "skill_tally": dict(self.skill_tally),
