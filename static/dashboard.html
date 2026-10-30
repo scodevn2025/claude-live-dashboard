@@ -1758,7 +1758,7 @@ setInterval(() => {
 }, 2000);
 </script>
 
-<!-- v17: Pipeline 3D — robot humanoid + phòng ban giả lập (van-phong-ao-3d pattern) -->
+<!-- v18: Pipeline 3D — 9 robot humanoid (idle yawn/coffee/type/stretch) + parcel stack output + scale scene -->
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1789,7 +1789,7 @@ function initPipeline3D() {
 
   const w0 = container.clientWidth, h0 = container.clientHeight || 300;
   const camera = new THREE.PerspectiveCamera(50, w0 / h0, 0.1, 100);
-  camera.position.set(0, 6, 15);
+  camera.position.set(0, 7, 20);
   camera.lookAt(0, 1.2, 0.3);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -2167,31 +2167,85 @@ function initPipeline3D() {
   }
 
   // Geometries
-  const toolGeo = new THREE.BoxGeometry(1.3, 0.55, 0.4);
-  const smallGeo = new THREE.BoxGeometry(0.95, 0.5, 0.35);
-  const resultGeo = new THREE.BoxGeometry(1.15, 0.55, 0.4);
   const knotGeo = new THREE.TorusKnotGeometry(0.3, 0.09, 48, 10);
   const torusGeo = new THREE.TorusGeometry(0.4, 0.12, 12, 28);
 
-  // Main row robots: ba + claude
-  makeRobotNode('node-user',   0xecc970, [-9,   0, -0.1], { title: 'ba', sub: 'prompt', titleColor: '#ecc970' }, { isHuman: true, scale: 1.15 });
+  // Parcel stack — 4 cardboard boxes staggered, top box carries label + is nodes[id] entry (pulseNode-friendly)
+  function makeParcelStack(id, boxHex, accentHex, pos, labelCfg) {
+    const [x, y, z] = pos;
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    const boxMat = () => new THREE.MeshStandardMaterial({
+      color: boxHex, emissive: new THREE.Color(accentHex),
+      emissiveIntensity: 0.18, roughness: 0.8, metalness: 0.05,
+    });
+    // Stack definition: [w,h,d, offsetX, baseY, offsetZ, rotY]
+    const specs = [
+      [1.1, 0.65, 0.9,  0.00, 0.325, 0.00,  0.00],
+      [0.95, 0.55, 0.75, 0.18, 0.95,  -0.05, 0.12],
+      [0.85, 0.5, 0.7,  -0.12, 1.47,  0.08, -0.08],
+      [0.75, 0.45, 0.65, 0.05, 1.93,  0.00, 0.05],
+    ];
+    const boxes = [];
+    specs.forEach((s, i) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(s[0], s[1], s[2]), boxMat());
+      m.position.set(s[3], s[4], s[5]);
+      m.rotation.y = s[6];
+      g.add(m);
+      // Tape accent (thin plane) across top of each box
+      const tape = new THREE.Mesh(
+        new THREE.PlaneGeometry(s[0] * 0.9, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x6b4a2a, roughness: 0.9 })
+      );
+      tape.rotation.x = -Math.PI / 2;
+      tape.position.set(s[3], s[4] + s[1] / 2 + 0.001, s[5]);
+      tape.rotation.z = s[6];
+      g.add(tape);
+      // Shipping label on front face
+      const lab = new THREE.Mesh(
+        new THREE.PlaneGeometry(s[0] * 0.4, s[1] * 0.35),
+        new THREE.MeshStandardMaterial({
+          color: 0xf5f0e4, emissive: new THREE.Color(accentHex),
+          emissiveIntensity: 0.45, roughness: 0.5,
+        })
+      );
+      lab.position.set(s[3] + Math.sin(s[6]) * s[2] / 2 * 0.01, s[4], s[5] + s[2] / 2 + 0.002);
+      lab.rotation.y = s[6];
+      g.add(lab);
+      boxes.push(m);
+    });
+    scene.add(g);
+    // Top box = nodes entry (pulseNode gán emissive lên nodes[id].material)
+    const top = boxes[boxes.length - 1];
+    top.userData = { baseEmissive: 0.5, hex: accentHex, isRobot: false };
+    top.material.emissiveIntensity = 0.5;
+    if (labelCfg) {
+      const label = makeLabel(labelCfg);
+      label.position.set(0, 2.5, 0);
+      g.add(label);
+    }
+    nodes[id] = top;
+    return top;
+  }
+
+  // Main row robots: ScodeVN (CEO) + claude
+  makeRobotNode('node-user',   0xecc970, [-9,   0, -0.1], { title: 'ScodeVN', sub: 'prompt', titleColor: '#ecc970' }, { isHuman: true, scale: 1.15 });
   makeRobotNode('node-claude', 0x4a9eff, [-5.5, 0, -0.1], { title: 'claude main', subId: 'n-claude-sub', sub: 'harness', extraId: 'n-claude-turns', extra: '0 turns', titleColor: '#4a9eff' }, { scale: 1.2 });
   // Think orb floats above claude
   makeNode('node-think',  knotGeo,   0xa287f4, [-5.5, 2.9, -0.1], { title: '💭 thinking', subId: 'n-think-tokens', sub: '0 tok', titleColor: '#a287f4' });
-  // Tool bus (desk-top device)
-  makeNode('node-tool',   toolGeo,   0x4a9eff, [-2.3, 1.75, -0.1], { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' });
-  // Stations: review, debug, verify, test (floating screen above desk)
-  makeNode('node-review', smallGeo,  0xffb547, [0.3, 1.75, -0.1], { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' });
-  makeNode('node-debug',  smallGeo,  0xff5c5a, [2.7, 1.75, -0.1], { title: '🐞 debug', subId: 'n-debug', sub: '0 errors', titleColor: '#ff5c5a' });
-  makeNode('node-verify', smallGeo,  0x4ad9e4, [5.5, 1.75, -0.1], { title: '✓ verify', subId: 'n-verify', sub: '0 pass', titleColor: '#4ad9e4' });
-  makeNode('node-test',   smallGeo,  0x22d19a, [7.5, 1.75, -0.1], { title: '🧪 test', subId: 'n-test', sub: '0 run', titleColor: '#22d19a' });
+  // Worker robots: tool bus + review + debug + verify + test (humanoid scale 0.85)
+  makeRobotNode('node-tool',   0x4a9eff, [-2.3, 0, -0.1], { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' }, { scale: 0.85 });
+  makeRobotNode('node-review', 0xffb547, [0.3,  0, -0.1], { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' }, { scale: 0.85 });
+  makeRobotNode('node-debug',  0xff5c5a, [2.7,  0, -0.1], { title: '🐞 debug',  subId: 'n-debug',  sub: '0 errors', titleColor: '#ff5c5a' }, { scale: 0.85 });
+  makeRobotNode('node-verify', 0x4ad9e4, [5.5,  0, -0.1], { title: '✓ verify', subId: 'n-verify', sub: '0 pass',   titleColor: '#4ad9e4' }, { scale: 0.85 });
+  makeRobotNode('node-test',   0x22d19a, [7.5,  0, -0.1], { title: '🧪 test',  subId: 'n-test',   sub: '0 run',    titleColor: '#22d19a' }, { scale: 0.85 });
   // Sub-row robots: subagents + background
   makeRobotNode('node-agent', 0xf58cb5, [-2.3, 0, 3.1], { title: '👥 subagents', subId: 'n-agent-count', sub: '0 spawned', titleColor: '#f58cb5' }, { scale: 0.9 });
   makeRobotNode('node-bg',    0xffb547, [0.3,  0, 3.1], { title: '⚙ background', subId: 'n-bg-count', sub: '0 running', titleColor: '#ffb547' }, { scale: 0.9 });
   // Loops torus floats
   makeNode('node-loops',  torusGeo,  0xa287f4, [2.7, 2.3, 3.1], { title: '↻ loops', subId: 'n-loops', sub: '1 watch', titleColor: '#a287f4' });
-  // Result monitor
-  makeNode('node-result', resultGeo, 0x22d19a, [7.5, 1.75, 3.1], { title: '→ ba', subId: 'n-result-sub', sub: 'answer', titleColor: '#22d19a' });
+  // Result: stack of parcel boxes — output cuối pipeline, hàng giao
+  makeParcelStack('node-result', 0x9b7a56, 0x22d19a, [7.5, 0, 3.1], { title: '📦 sản phẩm', subId: 'n-result-sub', sub: 'ready to ship', titleColor: '#22d19a' });
 
   // --- Edges (world-position aware for robot visor nested under group) ---
   const edges = {};
@@ -2258,8 +2312,8 @@ function initPipeline3D() {
   controls.dampingFactor = 0.08;
   controls.enableZoom = true;
   controls.enablePan = false;
-  controls.minDistance = 8;
-  controls.maxDistance = 30;
+  controls.minDistance = 10;
+  controls.maxDistance = 35;
   controls.minPolarAngle = 0.3;
   controls.maxPolarAngle = 1.4;
   controls.target.set(0, 1.2, 0.3);
@@ -2306,7 +2360,7 @@ function initPipeline3D() {
       }
     }
 
-    // Robots: idle breathe (scale.y) + head look-around + bulb pulse
+    // Robots: idle breathe (scale.y) + head look-around + bulb pulse + idle actions (yawn/coffee/type/stretch)
     for (const key in robots) {
       const r = robots[key];
       if (!r.ready) continue;
@@ -2319,6 +2373,52 @@ function initPipeline3D() {
       const bInt = 0.6 + (Math.sin(phase * 1.5) * 0.4 + 0.4);
       r.bulbMat.color.setHex(r.hex);
       r.bulbMat.color.multiplyScalar(Math.min(1.2, bInt));
+      // Idle action loop — stagger per robot via random nextActionAt
+      if (!r.armBaseZ) {
+        r.armBaseZ = [r.arms[0].rotation.z, r.arms[1].rotation.z];
+        r.armBaseX = [r.arms[0].rotation.x, r.arms[1].rotation.x];
+        r.headBaseX = r.head.rotation.x;
+        r.nextActionAt = now + 2000 + Math.random() * 5000;
+        r.currentAction = null;
+        r.actionStart = 0;
+        r.actionEnd = 0;
+      }
+      if (!r.currentAction && now >= r.nextActionAt) {
+        const choices = ['yawn', 'coffee', 'type', 'stretch', 'idle'];
+        r.currentAction = choices[Math.floor(Math.random() * choices.length)];
+        r.actionStart = now;
+        r.actionEnd = now + (r.currentAction === 'type' ? 2200 : 1500) + Math.random() * 600;
+      }
+      if (r.currentAction) {
+        const span = Math.max(1, r.actionEnd - r.actionStart);
+        const prog = Math.min(1, Math.max(0, (now - r.actionStart) / span));
+        const ease = Math.sin(prog * Math.PI); // bell 0→1→0
+        if (r.currentAction === 'yawn') {
+          r.arms[0].rotation.z = r.armBaseZ[0] - 1.1 * ease;
+          r.arms[1].rotation.z = r.armBaseZ[1] + 1.1 * ease;
+          r.head.rotation.x = r.headBaseX - 0.3 * ease;
+        } else if (r.currentAction === 'coffee') {
+          r.arms[1].rotation.x = r.armBaseX[1] - 1.3 * ease;
+          r.arms[1].rotation.z = r.armBaseZ[1] + 0.3 * ease;
+          r.head.rotation.x = r.headBaseX + 0.1 * ease;
+        } else if (r.currentAction === 'type') {
+          const osc = Math.sin((now - r.actionStart) * 0.012) * 0.1;
+          r.arms[0].rotation.x = r.armBaseX[0] + 0.35 + osc;
+          r.arms[1].rotation.x = r.armBaseX[1] + 0.35 - osc;
+        } else if (r.currentAction === 'stretch') {
+          r.arms[0].rotation.z = r.armBaseZ[0] - 0.9 * ease;
+          r.arms[1].rotation.z = r.armBaseZ[1] + 0.9 * ease;
+        }
+        if (now >= r.actionEnd) {
+          r.currentAction = null;
+          r.nextActionAt = now + 3000 + Math.random() * 5500;
+          r.arms[0].rotation.z = r.armBaseZ[0];
+          r.arms[1].rotation.z = r.armBaseZ[1];
+          r.arms[0].rotation.x = r.armBaseX[0];
+          r.arms[1].rotation.x = r.armBaseX[1];
+          r.head.rotation.x = r.headBaseX;
+        }
+      }
     }
 
     // Screen flicker (random intensity 0.4-1.0)
@@ -2460,7 +2560,7 @@ function initPipeline3D() {
     }
   };
 
-  console.log('[pipeline-3d] v17 ready — 12 nodes (4 robot humanoid) · 15 edges · 5 phòng · ' + decor.desks.length + ' desks · ' + decor.racks.length + ' racks · spot per phòng');
+  console.log('[pipeline-3d] v18 ready — ' + Object.keys(nodes).length + ' nodes (' + Object.keys(robots).length + ' robot humanoid + parcel stack) · ' + Object.keys(edges).length + ' edges · 5 phòng · ' + decor.desks.length + ' desks · ' + decor.racks.length + ' racks · idle actions (yawn/coffee/type/stretch)');
 }
 </script>
 
