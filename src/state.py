@@ -44,7 +44,7 @@ class SessionState:
             "cache_create": 0,
             "thinking_total": 0,   # cumulative thinking tokens (extended thinking)
             "thinking_last": 0,    # thinking tokens turn gần nhất
-            "max_tokens": 200000,  # Claude context limit
+            "max_tokens": 1_000_000,  # Claude 1M context (Fable/Opus 4.7+)
         }
 
     def apply(self, event: dict) -> None:
@@ -152,7 +152,7 @@ class SessionState:
 
         ponytail: hardcoded fixed buckets, upgrade khi Claude Code expose structured usage.
         """
-        total_cap = self.context.get("max_tokens", 200_000)
+        total_cap = self.context.get("max_tokens", 1_000_000)
         ctx_used = self.context.get("tokens", 0)
         fixed = {
             "memory_files": 23_000,

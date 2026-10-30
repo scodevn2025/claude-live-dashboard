@@ -10,3 +10,5 @@ bin/
 *.lnk
 .env
 CREDENTIALS.txt
+_run_backend.bat
+backend.log

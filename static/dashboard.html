@@ -431,7 +431,7 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
     <div class="current-cmd" id="current-cmd">—</div>
   </div>
   <div class="ctx-wrap">
-    <div class="ctx-head"><span>context tokens</span><span><b id="ctx-used">0</b> / <span id="ctx-max">200k</span></span></div>
+    <div class="ctx-head"><span>context tokens</span><span><b id="ctx-used">0</b> / <span id="ctx-max">1M</span></span></div>
     <div class="ctx-bar"><div class="ctx-bar-fill" id="ctx-fill"></div></div>
   </div>
 </div>
@@ -467,7 +467,7 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 <div class="card" id="context-breakdown-card">
   <div class="panel-head">
     <div class="lbl"><i class="ti ti-stack-2" style="color: var(--violet);"></i> context breakdown · token allocation</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="ctx-bd-total">0 / 200k</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="ctx-bd-total">0 / 1M</div>
   </div>
   <div id="context-3d" style="height: 280px; position: relative; background: radial-gradient(ellipse at center, rgba(162,135,244,0.04), transparent 60%); border-radius: 10px; overflow: hidden;">
     <div class="pipeline-fallback" style="display:none; padding: 60px 20px; text-align:center; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 12px;">WebGL cần thiết</div>
@@ -616,7 +616,7 @@ const KIND_LABEL = {
   user_msg: 'user', assistant_text: 'text', api_request: 'api', system: 'sys',
 };
 
-let state = { counters: {}, startedAt: Date.now() / 1000, kindTally: {}, ctxTokens: 0, ctxMax: 200000, loops: [] };
+let state = { counters: {}, startedAt: Date.now() / 1000, kindTally: {}, ctxTokens: 0, ctxMax: 1_000_000, loops: [] };
 let evTimes = [];
 let activeTools = 0;
 
@@ -820,7 +820,7 @@ function updateCounters(c, ctx) {
   animCounter('total-events', total);
   // Real context tokens từ Claude API usage
   if (ctx && ctx.tokens) {
-    updateContextTokens(ctx.tokens, ctx.max_tokens || 200000);
+    updateContextTokens(ctx.tokens, ctx.max_tokens || 1_000_000);
   }
   // Thinking tokens — hiển thị trong panel riêng
   if (ctx) {
@@ -1767,7 +1767,7 @@ setInterval(() => {
   if (!state.context || !state.context.tokens) {
     const c = state.counters || {};
     const est = (c.tool_calls || 0) * 1500 + (c.assistant_turns || 0) * 2500 + (c.user_msgs || 0) * 300;
-    updateContextTokens(est, 200000);
+    updateContextTokens(est, 1_000_000);
   }
 }, 2000);
 </script>
