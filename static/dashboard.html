@@ -127,9 +127,10 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .panel-3d-container.webgl-off { display: none; }
 /* Force 3D off cho skills/kinds/loops — gom thành metrics strip compact 2D */
 #skills-3d, #kinds-3d, #loops-3d { display: none !important; }
-.cmd-think-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
-.cmd-think-row .card { margin: 0 !important; }
+.cmd-think-row, .timeline-sess-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.cmd-think-row .card, .timeline-sess-row .card { margin: 0 !important; }
 .cmd-think-row .cmds-list, .cmd-think-row .think-list { max-height: 260px; overflow-y: auto; }
+.timeline-sess-row .tl, .timeline-sess-row .sess-list { max-height: 320px; overflow-y: auto; }
 .metrics-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
 .metrics-strip .card { padding: 10px 12px; }
 .metrics-strip .card .lbl { font-size: 10px; margin-bottom: 6px; }
@@ -1656,16 +1657,62 @@ renderEvent = function(ev) {
     }
 
     // Group 3 cards (skills + kinds + loops) vào 1 metrics-strip compact
+    // IMPORTANT: Insert strip vào .wrap LEVEL (không trong scene-grid parent cũ → tránh bị crush narrow)
     const skillsCard = document.getElementById('skills-3d')?.closest('.card');
     const kindsCard = document.getElementById('kinds-3d')?.closest('.card');
     const loopsCard = document.getElementById('loops-3d')?.closest('.card');
     if (skillsCard && kindsCard && loopsCard) {
       const strip = document.createElement('div');
       strip.className = 'metrics-strip';
-      skillsCard.parentNode.insertBefore(strip, skillsCard);
+      // Insert vào .wrap sau pipeline/cmd-think-row (NOT inside scene-grid parent)
+      const sceneGrid = skillsCard.closest('.grid.scene-grid');
+      const anchor = document.querySelector('.cmd-think-row') || document.querySelector('.pipeline');
+      if (anchor && anchor.parentNode) {
+        anchor.parentNode.insertBefore(strip, anchor.nextSibling);
+      } else {
+        wrap.appendChild(strip);
+      }
       strip.appendChild(skillsCard);
       strip.appendChild(kindsCard);
       strip.appendChild(loopsCard);
+      // Nếu scene-grid giờ chỉ còn agent-tree, giữ nó full width hoặc hide empty
+      if (sceneGrid && sceneGrid.children.length <= 1) {
+        sceneGrid.style.gridTemplateColumns = '1fr';
+      }
+    }
+
+    // Group Timeline + Sessions thành 2 cột ngang hàng — insert tại .wrap level
+    // tránh bị crush trong .grid.activity-grid parent (4-col) như metrics-strip trước đó
+    const timelineCard = document.querySelector('.card.timeline-card');
+    const sessCard = Array.from(wrap.querySelectorAll('.card')).find(c => {
+      const lbl = c.querySelector('.lbl')?.textContent || '';
+      return lbl.includes('phiên gần đây');
+    });
+    if (timelineCard && sessCard) {
+      const tsRow = document.createElement('div');
+      tsRow.className = 'timeline-sess-row';
+      const activityGrid = timelineCard.closest('.grid.activity-grid');
+      const sessGridParent = sessCard.parentElement;
+      // Insert tsRow ở wrap level, sau metrics-strip hoặc scene-grid
+      const tsAnchor = document.querySelector('.metrics-strip') ||
+                       document.querySelector('.grid.scene-grid') ||
+                       document.querySelector('.cmd-think-row') ||
+                       document.querySelector('.pipeline');
+      if (tsAnchor && tsAnchor.parentNode) {
+        tsAnchor.parentNode.insertBefore(tsRow, tsAnchor.nextSibling);
+      } else {
+        wrap.appendChild(tsRow);
+      }
+      tsRow.appendChild(timelineCard);
+      tsRow.appendChild(sessCard);
+      // Nếu activity-grid giờ trống (chỉ còn timeline đã move) → collapse
+      if (activityGrid && activityGrid.children.length === 0) {
+        activityGrid.style.display = 'none';
+      }
+      // Sess parent cũng có thể là grid 2-col; nếu trống thì ẩn
+      if (sessGridParent && sessGridParent !== wrap && sessGridParent.children.length === 0) {
+        sessGridParent.style.display = 'none';
+      }
     }
 
     const footer = wrap.querySelector('.footer');
