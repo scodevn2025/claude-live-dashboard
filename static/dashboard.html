@@ -1785,18 +1785,18 @@ if (!webglOk || !container) {
 
 function initPipeline3D() {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0a0a0d, 22, 60);
+  scene.fog = new THREE.Fog(0x0a0a0d, 28, 75);
 
   const w0 = container.clientWidth, h0 = container.clientHeight || 300;
   const camera = new THREE.PerspectiveCamera(50, w0 / h0, 0.1, 100);
-  camera.position.set(0, 7, 20);
+  camera.position.set(0, 6.5, 18);
   camera.lookAt(0, 1.2, 0.3);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(w0, h0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.1;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
 
@@ -1816,8 +1816,8 @@ function initPipeline3D() {
   } catch (e) { console.warn('[pipeline-3d] PMREM failed', e); }
 
   // --- Lights: hemispheric sky + ambient + directional sun + point accent ---
-  scene.add(new THREE.HemisphereLight(0xbccde8, 0x1a1a26, 0.42));
-  scene.add(new THREE.AmbientLight(0x404060, 0.22));
+  scene.add(new THREE.HemisphereLight(0xbccde8, 0x1a1a26, 0.65));
+  scene.add(new THREE.AmbientLight(0x404060, 0.4));
   const sun = new THREE.DirectionalLight(0xfff1dc, 0.85);
   sun.position.set(-8, 14, 10);
   scene.add(sun);
