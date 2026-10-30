@@ -3,18 +3,46 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
+import secrets as pysecrets
 from pathlib import Path
 
 import orjson
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.requests import Request
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sse_starlette.sse import EventSourceResponse
 
 from .inventory import inventory
 from .parser import parse_event
 from .state import SessionState
 from .watcher import find_active_session, tail_file
+
+# --- Basic Auth (gate dashboard khi expose public qua tunnel) ---
+# Set DASHBOARD_USER + DASHBOARD_PASSWORD env vars. Unset → NO AUTH (local only).
+AUTH_USER = os.getenv("DASHBOARD_USER", "")
+AUTH_PASS = os.getenv("DASHBOARD_PASSWORD", "")
+_security = HTTPBasic(auto_error=False)
+
+
+def require_auth(creds: HTTPBasicCredentials | None = Depends(_security)):
+    if not AUTH_USER or not AUTH_PASS:
+        return  # no-auth mode (local dev)
+    if not creds:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Auth required",
+            headers={"WWW-Authenticate": 'Basic realm="Claude Dashboard"'},
+        )
+    ok_u = pysecrets.compare_digest(creds.username.encode(), AUTH_USER.encode())
+    ok_p = pysecrets.compare_digest(creds.password.encode(), AUTH_PASS.encode())
+    if not (ok_u and ok_p):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": 'Basic realm="Claude Dashboard"'},
+        )
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
@@ -97,7 +125,11 @@ async def lifespan(_app: FastAPI):
             await task
 
 
-app = FastAPI(lifespan=lifespan, title="Claude Live Dashboard")
+app = FastAPI(
+    lifespan=lifespan,
+    title="Claude Live Dashboard",
+    dependencies=[Depends(require_auth)],
+)
 
 
 @app.get("/")

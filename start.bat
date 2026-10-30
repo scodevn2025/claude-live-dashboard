@@ -19,6 +19,13 @@ del "%TEMP%\cld_health.txt" >nul 2>&1
 if "%HEALTH%"=="200" (
   echo [=] Backend already running on :8765
 ) else (
+  REM Load .env if exists (DASHBOARD_USER + DASHBOARD_PASSWORD cho basic auth)
+  if exist .env (
+    for /f "usebackq tokens=1,* delims==" %%a in (".env") do set "%%a=%%b"
+    echo [+] Loaded .env credentials
+  ) else (
+    echo [!] WARNING: .env missing — backend chạy NO AUTH mode
+  )
   echo [+] Starting uvicorn backend on :8765...
   start "claude-live-dashboard · backend" /min cmd /c "uv run python -X utf8 -m uvicorn src.main:app --host 127.0.0.1 --port 8765 --log-level warning"
   timeout /t 3 /nobreak >nul
