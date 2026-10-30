@@ -160,55 +160,6 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .ctx-head { display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); }
 .ctx-head b { color: var(--text-primary); font-weight: 500; }
 </style>
-</head>
-<body>
-<h2 class="sr-only">Claude live dashboard — realtime pipeline giám sát agent, tool calls, flow.</h2>
-<div class="wrap">
-
-<div class="topbar">
-  <div class="sess">
-    <span class="dot" id="conn-dot"></span>
-    <span id="conn-text">kết nối SSE…</span>
-    <span style="color: var(--text-muted);">·</span>
-    <span id="sess-id" style="color: var(--text-primary);">—</span>
-    <span id="pin-badge" style="display:none; margin-left: 10px; padding: 2px 10px; background: rgba(226,117,36,0.2); color: #ff8451; border-radius: 10px; font-size: 11px; cursor: pointer;" title="click để unpin về auto mode">📍 pinned · click để unpin</span>
-  </div>
-  <div class="topbar-right">
-    <span><b id="uptime">00:00:00</b> uptime</span>
-    <span><b id="ev-rate">0</b> ev/s</span>
-    <span><b id="active-tools">0</b> active</span>
-  </div>
-</div>
-
-<div class="card hero card-glow" style="margin-bottom: 12px;">
-  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-    <div>
-      <div class="lbl">session đang xử lý</div>
-      <div class="val" style="color: var(--accent);">
-        <span class="dot" style="display: inline-block; margin-right: 10px; vertical-align: 3px; box-shadow: 0 0 12px rgba(34,209,154,0.6);"></span><span id="session-name">—</span>
-      </div>
-      <div class="sub" id="session-sub">—</div>
-    </div>
-    <div style="display: flex; gap: 28px;">
-      <div><div class="lbl">events total</div><div class="val" id="ev-total">0</div></div>
-      <div><div class="lbl">tool calls</div><div class="val" id="ev-tools">0</div></div>
-    </div>
-  </div>
-  <div class="current" id="current" style="display: none;">
-    <div><span class="current-name" id="current-name">—</span></div>
-    <div class="current-cmd" id="current-cmd">—</div>
-  </div>
-</div>
-
-<div class="card thinking-card" style="margin-bottom: 12px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <div class="lbl"><i class="ti ti-brain" style="color: var(--violet);"></i> thinking content · 10 gần nhất</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="think-count">0</div>
-  </div>
-  <div id="think-list" class="think-list">
-    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ extended thinking event…</div>
-  </div>
-</div>
 
 <style>
 .think-list { font-size: 11px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
@@ -224,69 +175,6 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .think-more { background: none; border: none; color: var(--violet); font-size: 10px; cursor: pointer; padding: 3px 0 0; font-family: 'JetBrains Mono', monospace; }
 .think-more:hover { text-decoration: underline; }
 </style>
-
-<div class="grid g4 counter-grid" style="margin-bottom: 12px;">
-  <div class="card"><div class="lbl">agent spawns</div><div class="val" id="c-agents">0</div><div class="sub">subagents created</div></div>
-  <div class="card"><div class="lbl">assistant turns</div><div class="val" id="c-turns">0</div><div class="sub">text responses</div></div>
-  <div class="card"><div class="lbl">user msgs</div><div class="val" id="c-user">0</div><div class="sub">prompts sent</div></div>
-  <div class="card"><div class="lbl">errors</div><div class="val" id="c-err" style="color: var(--red);">0</div><div class="sub">tool failures</div></div>
-</div>
-
-<div class="grid g2" style="margin-bottom: 12px;">
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <div class="lbl">timeline · last 60 events</div>
-      <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">auto scroll</div>
-    </div>
-    <div class="tl" id="timeline"></div>
-  </div>
-  <div class="card">
-    <div class="lbl">agent tree · spawn hierarchy</div>
-    <div id="agent-tree-3d" class="panel-3d-container" style="height:200px"></div>
-    <div class="tree panel-2d-fallback" id="tree">
-      <div class="tree-node has-children open"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;" id="tree-main-name">main session</span><span class="tree-status live">active</span></div>
-      <div id="tree-children" class="tree-children"></div>
-    </div>
-    <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--border);">
-      <div class="lbl">harness skills · time share</div>
-      <div id="skills-3d" class="panel-3d-container" style="height:180px"></div>
-      <div id="skills-share" class="panel-2d-fallback" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
-        <div style="color: var(--text-muted); padding: 4px 0;">chưa có skill invocation</div>
-      </div>
-      <div id="hot-path" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;"></div>
-    </div>
-    <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--border);">
-      <div class="lbl">event kinds breakdown</div>
-      <div id="kinds-3d" class="panel-3d-container" style="height:160px"></div>
-      <div class="kinds-bar panel-2d-fallback" id="kinds-bar"></div>
-      <div class="kinds-legend" id="kinds-legend"></div>
-    </div>
-    <div class="loops-section">
-      <div class="lbl">loops · lifecycle</div>
-      <div id="loops-3d" class="panel-3d-container" style="height:100px"></div>
-      <div id="loops-list" class="panel-2d-fallback">
-        <div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>
-      </div>
-    </div>
-    <div class="ctx-wrap">
-      <div class="ctx-head"><span>context tokens</span><span><b id="ctx-used">0</b> / <span id="ctx-max">200k</span></span></div>
-      <div class="ctx-bar"><div class="ctx-bar-fill" id="ctx-fill"></div></div>
-    </div>
-    <div class="ctx-wrap" style="margin-top: 6px; background: rgba(162,135,244,0.08); border-left: 2px solid var(--violet);">
-      <div class="ctx-head"><span><i class="ti ti-brain" style="color: var(--violet);"></i> thinking tokens</span><span><b id="think-last">0</b> last · <b id="think-total" style="color: var(--violet);">0</b> total</span></div>
-    </div>
-  </div>
-</div>
-
-<div class="card" style="margin-bottom: 12px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <div class="lbl">commands · bash / powershell / python / node · realtime</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="cmds-count">0 cmds</div>
-  </div>
-  <div id="cmds-list" class="cmds-list">
-    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ Bash tool call…</div>
-  </div>
-</div>
 
 <style>
 .cmds-list { font-size: 11px; max-height: 200px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; }
@@ -347,16 +235,6 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .row-disappearing { animation: rowDisappear 0.4s ease-in forwards; overflow: hidden; }
 </style>
 
-<div class="card" style="margin-bottom: 12px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <div class="lbl">file edits · đang/vừa sửa gần đây (realtime)</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="edits-count">0 ops</div>
-  </div>
-  <div id="edits-list" class="edits-list">
-    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ event Edit/Write/Read…</div>
-  </div>
-</div>
-
 <style>
 .edits-list { font-size: 11px; max-height: 180px; overflow-y: auto; }
 .edits-list::-webkit-scrollbar { width: 4px; }
@@ -385,14 +263,6 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .edit-dur.running { color: var(--accent); animation: pulse 1.4s ease-in-out infinite; font-weight: 500; }
 </style>
 
-<div class="card" style="margin-bottom: 12px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <div class="lbl">phiên gần đây · click để pin · icon ⤴ copy lệnh resume</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="sess-counts">—</div>
-  </div>
-  <div id="sess-list" class="sess-list"></div>
-</div>
-
 <style>
 .sess-list { font-size: 12px; max-height: 300px; overflow-y: auto; }
 .sess-list::-webkit-scrollbar { width: 4px; }
@@ -419,27 +289,6 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 .sess-tg i { color: var(--amber); font-size: 14px; }
 </style>
 
-<div class="card" style="margin-bottom: 12px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <div class="lbl">inventory · mcp + plugins + skills</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="inv-counts">—</div>
-  </div>
-  <div class="grid" style="grid-template-columns: 1fr 1fr 2fr; gap: 12px;">
-    <div class="inv-col">
-      <div style="font-size: 11px; font-weight: 500; color: var(--accent); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-plug tl-icon"></i> MCP servers</span><span id="inv-mcp-n" style="color: var(--text-muted);">0</span></div>
-      <div id="inv-mcps" class="inv-list"></div>
-    </div>
-    <div class="inv-col">
-      <div style="font-size: 11px; font-weight: 500; color: var(--violet); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-puzzle tl-icon"></i> Plugins</span><span id="inv-plug-n" style="color: var(--text-muted);">0</span></div>
-      <div id="inv-plugins" class="inv-list"></div>
-    </div>
-    <div class="inv-col">
-      <div style="font-size: 11px; font-weight: 500; color: var(--amber); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-sparkles tl-icon"></i> Skills</span><span id="inv-skill-n" style="color: var(--text-muted);">0</span></div>
-      <div id="inv-skills" class="inv-list"></div>
-    </div>
-  </div>
-</div>
-
 <style>
 .inv-list { font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 1.8; color: var(--text-secondary); max-height: 220px; overflow-y: auto; padding-right: 4px; }
 .inv-item { padding: 2px 6px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; gap: 6px; transition: background 0.15s; }
@@ -452,15 +301,65 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 </style>
 
+<style>
+.comp-pill { padding: 3px 10px; background: var(--surface-3); color: var(--text-muted); border-radius: 10px; opacity: 0.5; transition: all 0.4s; display: flex; align-items: center; gap: 4px; }
+.comp-pill.done { background: rgba(34,209,154,0.2); color: var(--green); opacity: 1; font-weight: 500; }
+.comp-pill.done::after { content: '✓'; margin-left: 4px; color: var(--green); font-weight: bold; }
+.comp-pill i { font-size: 12px; }
+</style>
+</head>
+<body>
+<h2 class="sr-only">Claude live dashboard — realtime pipeline giám sát agent, tool calls, flow.</h2>
+<div class="wrap">
+
+<div class="topbar">
+  <div class="sess">
+    <span class="dot" id="conn-dot"></span>
+    <span id="conn-text">kết nối SSE…</span>
+    <span style="color: var(--text-muted);">·</span>
+    <span id="sess-id" style="color: var(--text-primary);">—</span>
+    <span id="pin-badge" style="display:none; margin-left: 10px; padding: 2px 10px; background: rgba(226,117,36,0.2); color: #ff8451; border-radius: 10px; font-size: 11px; cursor: pointer;" title="click để unpin về auto mode">📍 pinned · click để unpin</span>
+  </div>
+  <div class="topbar-right">
+    <span><b id="uptime">00:00:00</b> uptime</span>
+    <span><b id="ev-rate">0</b> ev/s</span>
+    <span><b id="active-tools">0</b> active</span>
+  </div>
+</div>
+
+<div class="card hero card-glow">
+  <div class="hero-head">
+    <div class="hero-session">
+      <div class="lbl">session đang xử lý</div>
+      <div class="val" style="color: var(--accent);">
+        <span class="dot" style="display: inline-block; margin-right: 10px; vertical-align: 3px; box-shadow: 0 0 12px rgba(34,209,154,0.6);"></span><span id="session-name">DREAME L50S PRO ULTRA DIG handoff</span>
+      </div>
+      <div class="sub" id="session-sub">—</div>
+    </div>
+    <div class="hero-metrics">
+      <div><div class="lbl">events total</div><div class="val" id="ev-total">0</div></div>
+      <div><div class="lbl">tool calls</div><div class="val" id="ev-tools">0</div></div>
+    </div>
+  </div>
+  <div class="current" id="current" style="display: none;">
+    <div><span class="current-name" id="current-name">—</span></div>
+    <div class="current-cmd" id="current-cmd">—</div>
+  </div>
+  <div class="ctx-wrap">
+      <div class="ctx-head"><span>context tokens</span><span><b id="ctx-used">0</b> / <span id="ctx-max">200k</span></span></div>
+      <div class="ctx-bar"><div class="ctx-bar-fill" id="ctx-fill"></div></div>
+    </div>
+</div>
+
 <div class="pipeline">
   <div class="pipeline-head">
     <div class="lbl">pipeline · live flow <span style="color: var(--text-muted); font-weight: 400; margin-left: 6px;">· quy trình bắt buộc</span></div>
     <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="pipe-info">waiting for events…</div>
   </div>
   <!-- Compliance checklist bar — mỗi session phải đi đủ 5 stage -->
-  <div id="pipeline-compliance" style="display: flex; align-items: center; gap: 10px; margin: 8px 0 14px; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; font-size: 11px; font-family: 'JetBrains Mono', monospace;">
+  <div id="pipeline-compliance">
     <span style="color: var(--text-muted);">compliance</span>
-    <div style="display: flex; gap: 8px; flex: 1;">
+    <div class="compliance-stages">
       <div class="comp-pill" data-stage="think"><i class="ti ti-brain"></i> think</div>
       <div class="comp-pill" data-stage="tool"><i class="ti ti-tool"></i> tool</div>
       <div class="comp-pill" data-stage="review"><i class="ti ti-search"></i> review</div>
@@ -473,15 +372,120 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
       <span><b id="comp-score" style="color: var(--text-primary);">0</b>/6</span>
     </div>
   </div>
-<style>
-.comp-pill { padding: 3px 10px; background: var(--surface-3); color: var(--text-muted); border-radius: 10px; opacity: 0.5; transition: all 0.4s; display: flex; align-items: center; gap: 4px; }
-.comp-pill.done { background: rgba(34,209,154,0.2); color: var(--green); opacity: 1; font-weight: 500; }
-.comp-pill.done::after { content: '✓'; margin-left: 4px; color: var(--green); font-weight: bold; }
-.comp-pill i { font-size: 12px; }
-</style>
-  <div id="pipeline-3d">
+<div id="pipeline-3d">
     <div class="pipeline-fallback">WebGL cần thiết để render pipeline 3D. Trình duyệt chưa hỗ trợ hoặc GPU đã tắt.</div>
     <div class="p3d-hint">drag · xoay · scroll zoom</div>
+  </div>
+</div>
+
+<div class="grid scene-grid">
+  <div class="card">
+    <div class="lbl">agent tree · spawn hierarchy</div>
+    <div id="agent-tree-3d" class="panel-3d-container"></div>
+    <div class="tree panel-2d-fallback" id="tree">
+      <div class="tree-node has-children open"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;" id="tree-main-name">main session</span><span class="tree-status live">active</span></div>
+      <div id="tree-children" class="tree-children"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="lbl">harness skills · time share</div>
+    <div id="skills-3d" class="panel-3d-container"></div>
+    <div id="skills-share" class="panel-2d-fallback" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+        <div style="color: var(--text-muted); padding: 4px 0;">chưa có skill invocation</div>
+      </div>
+    <div id="hot-path" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;"></div>
+  </div>
+  <div class="card">
+    <div class="lbl">event kinds breakdown</div>
+    <div id="kinds-3d" class="panel-3d-container"></div>
+    <div class="kinds-bar panel-2d-fallback" id="kinds-bar"></div>
+    <div class="kinds-legend" id="kinds-legend"></div>
+  </div>
+  <div class="card loops-section">
+    <div class="lbl">loops · lifecycle</div>
+    <div id="loops-3d" class="panel-3d-container"></div>
+    <div id="loops-list" class="panel-2d-fallback">
+        <div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>
+      </div>
+  </div>
+</div>
+
+<div class="grid counter-grid">
+  <div class="card"><div class="lbl">agent spawns</div><div class="val" id="c-agents">0</div><div class="sub">subagents created</div></div>
+  <div class="card"><div class="lbl">assistant turns</div><div class="val" id="c-turns">0</div><div class="sub">text responses</div></div>
+  <div class="card"><div class="lbl">user msgs</div><div class="val" id="c-user">0</div><div class="sub">prompts sent</div></div>
+  <div class="card"><div class="lbl">errors</div><div class="val" id="c-err" style="color: var(--red);">0</div><div class="sub">tool failures</div></div>
+</div>
+
+<div class="grid activity-grid">
+<div class="card timeline-card">
+    <div class="panel-head">
+      <div class="lbl">timeline · last 60 events</div>
+      <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">auto scroll</div>
+    </div>
+    <div class="tl" id="timeline"></div>
+  </div>
+<div class="card thinking-card">
+  <div class="panel-head">
+    <div class="lbl"><i class="ti ti-brain" style="color: var(--violet);"></i> thinking content · 10 gần nhất</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="think-count">0</div>
+  </div>
+  <div id="think-list" class="think-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ extended thinking event…</div>
+  </div>
+  <div class="ctx-wrap">
+      <div class="ctx-head"><span><i class="ti ti-brain" style="color: var(--violet);"></i> thinking tokens</span><span><b id="think-last">0</b> last · <b id="think-total" style="color: var(--violet);">0</b> total</span></div>
+    </div>
+</div>
+</div>
+
+<div class="grid operations-grid">
+<div class="card">
+  <div class="panel-head">
+    <div class="lbl">commands · bash / powershell / python / node · realtime</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="cmds-count">0 cmds</div>
+  </div>
+  <div id="cmds-list" class="cmds-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ Bash tool call…</div>
+  </div>
+</div>
+<div class="card">
+  <div class="panel-head">
+    <div class="lbl">file edits · đang/vừa sửa gần đây (realtime)</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="edits-count">0 ops</div>
+  </div>
+  <div id="edits-list" class="edits-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ event Edit/Write/Read…</div>
+  </div>
+</div>
+</div>
+
+<div class="card">
+  <div class="panel-head">
+    <div class="lbl">phiên gần đây · click để pin · icon ⤴ copy lệnh resume</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="sess-counts">—</div>
+  </div>
+  <div id="sess-list" class="sess-list"></div>
+</div>
+
+<div class="card">
+  <div class="panel-head">
+    <div class="lbl">inventory · mcp + plugins + skills</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="inv-counts">—</div>
+  </div>
+  <div class="grid inventory-grid">
+    <div class="inv-col">
+      <div style="font-size: 11px; font-weight: 500; color: var(--accent); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-plug tl-icon"></i> MCP servers</span><span id="inv-mcp-n" style="color: var(--text-muted);">0</span></div>
+      <div id="inv-mcps" class="inv-list"></div>
+    </div>
+    <div class="inv-col">
+      <div style="font-size: 11px; font-weight: 500; color: var(--violet); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-puzzle tl-icon"></i> Plugins</span><span id="inv-plug-n" style="color: var(--text-muted);">0</span></div>
+      <div id="inv-plugins" class="inv-list"></div>
+    </div>
+    <div class="inv-col">
+      <div style="font-size: 11px; font-weight: 500; color: var(--amber); margin-bottom: 6px; display: flex; justify-content: space-between;"><span><i class="ti ti-sparkles tl-icon"></i> Skills</span><span id="inv-skill-n" style="color: var(--text-muted);">0</span></div>
+      <div id="inv-skills" class="inv-list"></div>
+    </div>
   </div>
 </div>
 
@@ -1534,14 +1538,20 @@ renderEvent = function(ev) {
   }
 };
 
-// Reorder sections: pipeline NGAY DƯỚI hero · metadata panels xuống cuối
+// Reorder sections: pipeline NGAY DƯỚI hero · commands NGAY DƯỚI pipeline · metadata panels xuống cuối
 (function reorder() {
   const wrap = document.querySelector('.wrap');
   const pipeline = document.querySelector('.pipeline');
   const hero = document.querySelector('.card.hero');
   if (wrap && pipeline && hero) {
-    // Move pipeline ngay sau hero (trước counter grid + timeline)
+    // Move pipeline ngay sau hero
     hero.parentNode.insertBefore(pipeline, hero.nextSibling);
+    // Move commands card ngay sau pipeline
+    const cmdCard = Array.from(wrap.querySelectorAll('.card')).find(c => {
+      const lbl = c.querySelector('.lbl')?.textContent || '';
+      return lbl.includes('commands') && lbl.includes('bash');
+    });
+    if (cmdCard) pipeline.parentNode.insertBefore(cmdCard, pipeline.nextSibling);
     // Move footer xuống cuối
     const footer = wrap.querySelector('.footer');
     if (footer) wrap.appendChild(footer);
