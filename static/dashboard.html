@@ -102,6 +102,13 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
 #pipeline-3d .pipeline-fallback { display: none; padding: 60px 20px; text-align: center; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 #pipeline-3d .p3d-hint { position: absolute; bottom: 6px; right: 10px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); opacity: 0.5; pointer-events: none; z-index: 2; }
 
+/* Panel 3D containers (v13) — small scenes bên cạnh / thay thế 2D versions */
+.panel-3d-container { width: 100%; position: relative; background: radial-gradient(ellipse at center, rgba(74,158,255,0.03), transparent 70%); border-radius: 8px; overflow: hidden; margin: 6px 0; }
+.panel-3d-container canvas { display: block; }
+.panel-3d-container.webgl-off { display: none; }
+.panel-2d-fallback { display: none; }  /* hidden khi 3D OK */
+.panel-2d-fallback.show-fallback { display: block; }
+
 .node-rect { fill: var(--surface-2); stroke-width: 1.5; }
 .node-rect.active { fill: var(--accent-dim); }
 .node-glow { filter: drop-shadow(0 0 8px currentColor); }
@@ -235,25 +242,29 @@ body { padding: 18px 20px; background: radial-gradient(1200px 600px at 20% -10%,
   </div>
   <div class="card">
     <div class="lbl">agent tree · spawn hierarchy</div>
-    <div class="tree" id="tree">
+    <div id="agent-tree-3d" class="panel-3d-container" style="height:200px"></div>
+    <div class="tree panel-2d-fallback" id="tree">
       <div class="tree-node has-children open"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;" id="tree-main-name">main session</span><span class="tree-status live">active</span></div>
       <div id="tree-children" class="tree-children"></div>
     </div>
     <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--border);">
       <div class="lbl">harness skills · time share</div>
-      <div id="skills-share" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+      <div id="skills-3d" class="panel-3d-container" style="height:180px"></div>
+      <div id="skills-share" class="panel-2d-fallback" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
         <div style="color: var(--text-muted); padding: 4px 0;">chưa có skill invocation</div>
       </div>
       <div id="hot-path" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;"></div>
     </div>
     <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--border);">
       <div class="lbl">event kinds breakdown</div>
-      <div class="kinds-bar" id="kinds-bar"></div>
+      <div id="kinds-3d" class="panel-3d-container" style="height:160px"></div>
+      <div class="kinds-bar panel-2d-fallback" id="kinds-bar"></div>
       <div class="kinds-legend" id="kinds-legend"></div>
     </div>
     <div class="loops-section">
       <div class="lbl">loops · lifecycle</div>
-      <div id="loops-list">
+      <div id="loops-3d" class="panel-3d-container" style="height:100px"></div>
+      <div id="loops-list" class="panel-2d-fallback">
         <div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>
       </div>
     </div>
@@ -639,6 +650,7 @@ function renderLoops(loops) {
   const el = document.getElementById('loops-list');
   if (!loops || loops.length === 0) {
     el.innerHTML = '<div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>';
+    if (window.updateLoops3D) window.updateLoops3D([]);
     return;
   }
   el.innerHTML = loops.map(l => {
@@ -652,6 +664,7 @@ function renderLoops(loops) {
       <div class="loop-name">${l.name}<div class="loop-meta">iter ${l.iter || 1} · next ${l.nextIn}s</div></div>
     </div>`;
   }).join('');
+  if (window.updateLoops3D) window.updateLoops3D(loops);
 }
 
 function toggleTreeChildren(evt) {
@@ -751,6 +764,7 @@ function renderAgentTree(snapshot) {
     </div>`);
   });
   children.innerHTML = parts.join('') || '<div style="color: var(--text-muted); font-size: 11px; padding-left: 20px;">no fork/bg tasks</div>';
+  if (window.updateAgentTree3D) window.updateAgentTree3D(snapshot);
 }
 
 function renderSkills(snapshot) {
@@ -782,6 +796,7 @@ function renderSkills(snapshot) {
   if (topTool) {
     hotEl.innerHTML = `<i class="ti ti-flame" style="color: var(--orange);"></i> hot path: ${sorted[0][0]} → ${topTool[0]}`;
   }
+  if (window.updateSkills3D) window.updateSkills3D(sorted);
 }
 
 function renderKinds() {
@@ -803,6 +818,7 @@ function renderKinds() {
   }
   // Animate bar in
   gsap.from('#kinds-bar > div', { scaleX: 0, transformOrigin: 'left', duration: 0.5, stagger: 0.03, ease: 'power3.out' });
+  if (window.updateKinds3D) window.updateKinds3D(sorted, total);
 }
 
 function emitParticle(edgeId, color) {
@@ -1185,6 +1201,7 @@ function updateStageNode(stage) {
     if (el) el.textContent = stageStats[stage] + ' ' + ({review:'ops', debug:'errors', verify:'pass', test:'run'})[stage];
     pulseNode('node-' + stage, {review:'#ffb547', debug:'#ff5c5a', verify:'#4ad9e4', test:'#22d19a'}[stage]);
   }
+  if (window.flashPhong) window.flashPhong(stage);
 }
 
 // Enhancement 7: load inventory MCP + plugins + skills
@@ -1759,6 +1776,39 @@ function initPipeline3D() {
   addEdge('edge-loop-back',   'node-debug',  'node-tool',   { curve: true, curveY: 2.5, color: 0xff5c5a, opacity: 0.4 });
   addEdge('edge-r-u',         'node-result', 'node-user',   { curve: true, curveY: -3.0, color: 0x22d19a, opacity: 0.3 });
 
+  // --- Phòng ảo (van-phong-ao-3d pattern) — wireframe rooms behind stage nodes ---
+  const phongs = {};
+  function makePhong(stage, pos, size, hex, labelText) {
+    const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);
+    const edgeGeo = new THREE.EdgesGeometry(geo);
+    const mat = new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: 0.28 });
+    const frame = new THREE.LineSegments(edgeGeo, mat);
+    frame.position.set(...pos);
+    frame.userData = { stage, baseOp: 0.28, hex };
+    scene.add(frame);
+    const rug = new THREE.Mesh(
+      new THREE.BoxGeometry(size[0] - 0.1, 0.04, size[2] - 0.1),
+      new THREE.MeshStandardMaterial({ color: 0x12121a, emissive: new THREE.Color(hex), emissiveIntensity: 0.06, roughness: 0.9 })
+    );
+    rug.position.set(pos[0], pos[1] - size[1] / 2 + 0.02, pos[2]);
+    scene.add(rug);
+    frame.userData.rug = rug;
+    const el = document.createElement('div');
+    const colHex = '#' + hex.toString(16).padStart(6, '0');
+    el.style.cssText = `font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:${colHex}; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap; opacity:0.75;`;
+    el.textContent = labelText;
+    const lab = new CSS2DObject(el);
+    lab.position.set(0, size[1] / 2 + 0.15, 0);
+    frame.add(lab);
+    phongs[stage] = frame;
+  }
+  makePhong('review', [0.3,  1.0, -1.8], [2.0, 2.4, 1.4], 0xffb547, 'phòng kiểm tra');
+  makePhong('debug',  [2.7,  1.0, -1.8], [2.0, 2.4, 1.4], 0xff5c5a, 'phòng dev');
+  makePhong('verify', [5.1,  1.0, -1.8], [2.0, 2.4, 1.4], 0x4ad9e4, 'phòng test');
+  phongs['test'] = phongs['verify']; // test shares phong-test với verify
+  // Khu Codex placeholder (bg_tasks)
+  makePhong('codex',  [-0.5, -2.6, 2.5], [3.2, 1.8, 1.3], 0xffb547, 'khu codex');
+
   // --- OrbitControls ---
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -1880,8 +1930,391 @@ function initPipeline3D() {
     }
   };
 
-  console.log('[pipeline-3d] ready — 12 nodes · 15 edges · fog + ACES tonemap · RoomEnvironment');
+  // Flash phòng ảo khi stage trigger — van-phong-ao-3d pattern
+  window.flashPhong = function(stage) {
+    const f = phongs[stage]; if (!f) return;
+    f.material.opacity = 1.0;
+    if (f.userData.rug) {
+      f.userData.rug.material.emissiveIntensity = 0.9;
+      if (window.gsap) gsap.to(f.userData.rug.material, { emissiveIntensity: 0.06, duration: 1.2, ease: 'power2.out' });
+    }
+    if (window.gsap) gsap.to(f.material, { opacity: f.userData.baseOp, duration: 1.0, ease: 'power2.out' });
+  };
+
+  console.log('[pipeline-3d] ready — 12 nodes · 15 edges · fog + ACES tonemap · RoomEnvironment · 4 phong ao');
 }
+</script>
+
+<!-- v13: 4 panel 3D — agent tree orbit · skills bars · kinds donut · loops rings -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// WebGL probe — fallback to 2D nếu WebGL off
+let webglOk = true;
+try {
+  const c = document.createElement('canvas');
+  if (!(c.getContext('webgl') || c.getContext('experimental-webgl'))) webglOk = false;
+} catch (e) { webglOk = false; }
+
+if (!webglOk) {
+  document.querySelectorAll('.panel-3d-container').forEach(el => el.classList.add('webgl-off'));
+  document.querySelectorAll('.panel-2d-fallback').forEach(el => el.classList.add('show-fallback'));
+  console.warn('[panels-3d] WebGL unavailable — fallback 2D');
+} else {
+  initAgentTree3D();
+  initSkills3D();
+  initKinds3D();
+  initLoops3D();
+}
+
+// Shared scene factory — các panel share pattern (lights + resize + ACES)
+function makeScene(container, cfg) {
+  const scene = new THREE.Scene();
+  if (cfg.fog) scene.fog = new THREE.Fog(0x0a0a0d, 8, 24);
+  const w0 = container.clientWidth || 320, h0 = container.clientHeight || 180;
+  const camera = new THREE.PerspectiveCamera(cfg.fov || 45, w0 / h0, 0.1, 100);
+  camera.position.set(...(cfg.cam || [0, 2, 7]));
+  camera.lookAt(0, 0, 0);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.setSize(w0, h0);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+  const labelR = new CSS2DRenderer();
+  labelR.setSize(w0, h0);
+  labelR.domElement.style.cssText = 'position:absolute; top:0; left:0; pointer-events:none;';
+  container.appendChild(labelR.domElement);
+  // Lights — ambient + point key/fill, cinematic
+  scene.add(new THREE.AmbientLight(0x404060, 0.5));
+  const k = new THREE.PointLight(0x4a9eff, 1.0, 20); k.position.set(2, 5, 4); scene.add(k);
+  const f = new THREE.PointLight(0xa287f4, 0.5, 20); f.position.set(-3, 3, 2); scene.add(f);
+  // Resize responsive per renderer
+  function onResize() {
+    const w = container.clientWidth, h = container.clientHeight || h0;
+    if (!w) return;
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setSize(w, h); labelR.setSize(w, h);
+  }
+  window.addEventListener('resize', onResize);
+  if (window.ResizeObserver) new ResizeObserver(onResize).observe(container);
+  return { scene, camera, renderer, labelR };
+}
+
+// ---- 1. Agent tree 3D orbit — van-phong-ao-3d pattern (ring around main) ----
+function initAgentTree3D() {
+  const c = document.getElementById('agent-tree-3d'); if (!c) return;
+  const { scene, camera, renderer, labelR } = makeScene(c, { cam: [0, 1.5, 5.5], fov: 50, fog: true });
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.autoRotate = true; controls.autoRotateSpeed = 0.5;
+  controls.enablePan = false; controls.minDistance = 3.5; controls.maxDistance = 10;
+
+  // Main sphere = central node (glow emissive accent)
+  const mainMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a24, emissive: 0x4a9eff, emissiveIntensity: 1.2,
+    roughness: 0.2, metalness: 0.6
+  });
+  const main = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 16), mainMat);
+  scene.add(main);
+  const mainEl = document.createElement('div');
+  mainEl.style.cssText = 'color:#4a9eff; font-family:"JetBrains Mono",monospace; font-size:10px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none;';
+  mainEl.textContent = 'main · session';
+  mainEl.id = 'tree3d-main-label';
+  const mainLab = new CSS2DObject(mainEl);
+  mainLab.position.set(0, 0.75, 0);
+  main.add(mainLab);
+
+  // Orbit ring (visual hint for subagent path)
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(2.0, 0.01, 6, 72),
+    new THREE.MeshBasicMaterial({ color: 0x4a4a55, transparent: true, opacity: 0.3 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+
+  const orbitGroup = new THREE.Group();
+  scene.add(orbitGroup);
+  const orbMeshes = new Map();
+  const subColors = { fork: 0xf58cb5, bg: 0xffb547 };
+
+  window.updateAgentTree3D = function(snapshot) {
+    const sub = (snapshot.subagents || []).map(s => ({ ...s, _kind: 'fork', _key: 'fork:' + (s.name || s.id || JSON.stringify(s)) }));
+    const bg  = (snapshot.bg_tasks  || []).map(b => ({ ...b, _kind: 'bg',   _key: 'bg:'   + (b.name || b.id || JSON.stringify(b)) }));
+    const items = [...sub, ...bg];
+    const seen = new Set();
+    const r = 2.0;
+    items.forEach((item, i) => {
+      const theta = (i / Math.max(1, items.length)) * Math.PI * 2;
+      const key = item._key;
+      seen.add(key);
+      let entry = orbMeshes.get(key);
+      if (!entry) {
+        const hex = subColors[item._kind] || 0x4a9eff;
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x151521, emissive: hex, emissiveIntensity: 0.7,
+          roughness: 0.3, metalness: 0.5
+        });
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), mat);
+        orbitGroup.add(mesh);
+        const el = document.createElement('div');
+        const colHex = '#' + hex.toString(16).padStart(6, '0');
+        el.style.cssText = `color:${colHex}; font-family:"JetBrains Mono",monospace; font-size:9px; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:auto; cursor:pointer; white-space:nowrap; padding:1px 4px; border-radius:3px;`;
+        el.textContent = (item.name || item._kind).slice(0, 16);
+        el.title = `${item._kind} · ${item.status || 'running'}`;
+        el.addEventListener('click', () => {
+          el.style.background = 'rgba(74,158,255,0.3)';
+          setTimeout(() => el.style.background = '', 1000);
+        });
+        const lab = new CSS2DObject(el);
+        lab.position.set(0, 0.35, 0);
+        mesh.add(lab);
+        entry = { mesh, label: el, kind: item._kind };
+        orbMeshes.set(key, entry);
+      }
+      entry.mesh.position.set(Math.cos(theta) * r, 0, Math.sin(theta) * r);
+      const statusColor = item.status === 'error' ? 0xff5c5a
+        : (item.status === 'running' ? subColors[item._kind] : 0x6a6a73);
+      entry.mesh.material.emissive.setHex(statusColor);
+      entry.mesh.material.emissiveIntensity = item.status === 'running' ? 1.0 : 0.4;
+      entry.label.textContent = (item.name || item._kind).slice(0, 16);
+      entry.label.title = `${item._kind} · ${item.status || 'running'}`;
+    });
+    // Dispose gone
+    for (const [k, e] of orbMeshes) {
+      if (!seen.has(k)) {
+        orbitGroup.remove(e.mesh);
+        e.mesh.geometry.dispose(); e.mesh.material.dispose();
+        orbMeshes.delete(k);
+      }
+    }
+    const lbl = document.getElementById('tree3d-main-label');
+    if (lbl && snapshot.session_id) lbl.textContent = 'main · ' + snapshot.session_id.slice(0, 8);
+  };
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    main.rotation.y += 0.005;
+    main.material.emissiveIntensity = 1.0 + Math.sin(Date.now() * 0.002) * 0.3;
+    renderer.render(scene, camera);
+    labelR.render(scene, camera);
+  }
+  animate();
+}
+
+// ---- 2. Harness skills 3D bar chart ----
+function initSkills3D() {
+  const c = document.getElementById('skills-3d'); if (!c) return;
+  const { scene, camera, renderer, labelR } = makeScene(c, { cam: [0, 3.0, 5.5], fov: 48, fog: true });
+  camera.lookAt(0, 1, 0);
+
+  // Floor
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 3),
+    new THREE.MeshStandardMaterial({ color: 0x0e0e14, roughness: 0.95, metalness: 0.1 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  const barGroup = new THREE.Group();
+  scene.add(barGroup);
+  const bars = new Map();
+  const colors = [0x4a9eff, 0x22d19a, 0xa287f4, 0xff8451, 0xf58cb5, 0xffb547];
+
+  window.updateSkills3D = function(sorted) {
+    if (!sorted || sorted.length === 0) return;
+    const total = sorted.reduce((a, b) => a + b[1], 0);
+    const top = sorted.slice(0, 6);
+    const spacing = 0.95;
+    const startX = -(top.length - 1) * spacing / 2;
+    const seen = new Set();
+    top.forEach(([name, n], i) => {
+      const pct = (n / total * 100);
+      const height = Math.max(0.2, (pct / 100) * 3.0);
+      seen.add(name);
+      let entry = bars.get(name);
+      if (!entry) {
+        const hex = colors[i % colors.length];
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x151521, emissive: hex, emissiveIntensity: 0.6,
+          roughness: 0.35, metalness: 0.5
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1, 0.55), mat);
+        barGroup.add(mesh);
+        const el = document.createElement('div');
+        const colHex = '#' + hex.toString(16).padStart(6, '0');
+        el.style.cssText = `color:${colHex}; font-family:"JetBrains Mono",monospace; font-size:9px; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap;`;
+        const lab = new CSS2DObject(el);
+        lab.position.set(0, 0.6, 0);
+        mesh.add(lab);
+        entry = { mesh, label: el, hex };
+        bars.set(name, entry);
+      }
+      entry.mesh.position.set(startX + i * spacing, height / 2, 0);
+      entry.mesh.scale.y = height;
+      entry.label.textContent = `${name.slice(0, 10)} ${pct.toFixed(0)}%`;
+    });
+    for (const [k, e] of bars) {
+      if (!seen.has(k)) {
+        barGroup.remove(e.mesh);
+        e.mesh.geometry.dispose(); e.mesh.material.dispose();
+        bars.delete(k);
+      }
+    }
+  };
+
+  function animate() {
+    requestAnimationFrame(animate);
+    barGroup.rotation.y = Math.sin(Date.now() * 0.0003) * 0.1;
+    renderer.render(scene, camera);
+    labelR.render(scene, camera);
+  }
+  animate();
+}
+
+// ---- 3. Event kinds 3D donut (TorusGeometry wedges per kind) ----
+function initKinds3D() {
+  const c = document.getElementById('kinds-3d'); if (!c) return;
+  const { scene, camera, renderer, labelR } = makeScene(c, { cam: [0, 2.6, 3.2], fov: 50, fog: false });
+  camera.lookAt(0, 0, 0);
+
+  const donutGroup = new THREE.Group();
+  donutGroup.rotation.x = Math.PI * 0.42;
+  scene.add(donutGroup);
+  const segments = new Map();
+  const KIND_COLORS = {
+    tool_use: 0x4a9eff, tool_result: 0x22d19a, agent_spawn: 0xf58cb5,
+    user_msg: 0xa287f4, assistant_text: 0x9b9ba3, api_request: 0xffb547,
+    system: 0x6a6a73, unknown: 0x6a6a73,
+  };
+  // Center label (top kind)
+  const centerEl = document.createElement('div');
+  centerEl.id = 'kinds3d-top-label';
+  centerEl.style.cssText = 'color:#ececec; font-family:"JetBrains Mono",monospace; font-size:10px; font-weight:600; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap;';
+  centerEl.textContent = 'no events';
+  const centerLab = new CSS2DObject(centerEl);
+  centerLab.position.set(0, 0, 0);
+  scene.add(centerLab);
+
+  window.updateKinds3D = function(sorted, total) {
+    if (!sorted || sorted.length === 0 || !total) return;
+    let acc = 0;
+    const seen = new Set();
+    for (const [kind, n] of sorted) {
+      const frac = n / total;
+      const start = acc * Math.PI * 2;
+      const length = Math.max(0.05, frac * Math.PI * 2);
+      acc += frac;
+      seen.add(kind);
+      let mesh = segments.get(kind);
+      const hex = KIND_COLORS[kind] || 0x6a6a73;
+      if (!mesh) {
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x151521, emissive: hex, emissiveIntensity: 0.6,
+          roughness: 0.3, metalness: 0.5
+        });
+        mesh = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.3, 10, 24, length), mat);
+        mesh.userData = { kind, hex };
+        donutGroup.add(mesh);
+        segments.set(kind, mesh);
+      } else {
+        mesh.geometry.dispose();
+        mesh.geometry = new THREE.TorusGeometry(1.0, 0.3, 10, 24, length);
+      }
+      mesh.rotation.z = start;
+    }
+    const [topKind, topN] = sorted[0];
+    centerEl.textContent = `${topKind.slice(0,8)} ${(topN/total*100).toFixed(0)}%`;
+    centerEl.style.color = '#' + (KIND_COLORS[topKind] || 0x6a6a73).toString(16).padStart(6, '0');
+    for (const [k, m] of segments) {
+      if (!seen.has(k)) {
+        donutGroup.remove(m);
+        m.geometry.dispose(); m.material.dispose();
+        segments.delete(k);
+      }
+    }
+  };
+
+  function animate() {
+    requestAnimationFrame(animate);
+    donutGroup.rotation.z += 0.004;
+    renderer.render(scene, camera);
+    labelR.render(scene, camera);
+  }
+  animate();
+}
+
+// ---- 4. Loops lifecycle 3D rings (TorusGeometry progress) ----
+function initLoops3D() {
+  const c = document.getElementById('loops-3d'); if (!c) return;
+  const { scene, camera, renderer, labelR } = makeScene(c, { cam: [0, 0.2, 2.8], fov: 50, fog: false });
+
+  const loopGroup = new THREE.Group();
+  scene.add(loopGroup);
+  const rings = new Map();
+
+  window.updateLoops3D = function(loops) {
+    if (!loops || loops.length === 0) {
+      for (const [k, r] of rings) {
+        loopGroup.remove(r.bg); loopGroup.remove(r.fg);
+        r.bg.geometry.dispose(); r.bg.material.dispose();
+        r.fg.geometry.dispose(); r.fg.material.dispose();
+      }
+      rings.clear();
+      return;
+    }
+    const seen = new Set();
+    const spacing = 1.3;
+    const startX = -(loops.length - 1) * spacing / 2;
+    loops.forEach((l, i) => {
+      const name = l.name;
+      seen.add(name);
+      let r = rings.get(name);
+      if (!r) {
+        const bgMat = new THREE.MeshStandardMaterial({ color: 0x1e1e26, emissive: 0x2a2a35, emissiveIntensity: 0.3, roughness: 0.6 });
+        const bg = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.08, 10, 48), bgMat);
+        loopGroup.add(bg);
+        const fgMat = new THREE.MeshStandardMaterial({ color: 0x151521, emissive: 0x4a9eff, emissiveIntensity: 1.3, roughness: 0.2, metalness: 0.5 });
+        const fg = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.09, 10, 48, 0.1), fgMat);
+        loopGroup.add(fg);
+        const el = document.createElement('div');
+        el.style.cssText = 'color:#ececec; font-family:"JetBrains Mono",monospace; font-size:9px; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap; line-height:1.2;';
+        const lab = new CSS2DObject(el);
+        bg.add(lab);
+        r = { bg, fg, label: el };
+        rings.set(name, r);
+      }
+      const x = startX + i * spacing;
+      r.bg.position.x = x;
+      r.fg.position.x = x;
+      r.fg.geometry.dispose();
+      const theta = Math.max(0.02, l.progress || 0) * Math.PI * 2;
+      r.fg.geometry = new THREE.TorusGeometry(0.48, 0.09, 10, 48, theta);
+      r.label.innerHTML = `<b style="color:#4a9eff;">${Math.round((l.progress || 0) * 100)}%</b><br><span style="color:#9b9ba3; font-size:8px;">iter ${l.iter || 1} · ${l.nextIn}s</span>`;
+    });
+    for (const [k, r] of rings) {
+      if (!seen.has(k)) {
+        loopGroup.remove(r.bg); loopGroup.remove(r.fg);
+        r.bg.geometry.dispose(); r.bg.material.dispose();
+        r.fg.geometry.dispose(); r.fg.material.dispose();
+        rings.delete(k);
+      }
+    }
+  };
+
+  function animate() {
+    requestAnimationFrame(animate);
+    for (const [, r] of rings) r.fg.rotation.z += 0.025;
+    renderer.render(scene, camera);
+    labelR.render(scene, camera);
+  }
+  animate();
+}
+
+console.log('[panels-3d] v13 ready — agent tree orbit · skills bars · kinds donut · loops rings');
 </script>
 </body>
 </html>
