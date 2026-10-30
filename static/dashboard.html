@@ -1758,7 +1758,7 @@ setInterval(() => {
 }, 2000);
 </script>
 
-<!-- v12: Three.js 3D pipeline — replaces SVG, overrides pulseNode/emitParticle/sustainToolNode -->
+<!-- v17: Pipeline 3D — robot humanoid + phòng ban giả lập (van-phong-ao-3d pattern) -->
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1768,7 +1768,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 const container = document.getElementById('pipeline-3d');
 const fallback = container?.querySelector('.pipeline-fallback');
 
-// WebGL probe
+// WebGL probe (fallback hiện có — giữ nguyên)
 let webglOk = true;
 try {
   const c = document.createElement('canvas');
@@ -1785,12 +1785,12 @@ if (!webglOk || !container) {
 
 function initPipeline3D() {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0a0a0d, 18, 55);
+  scene.fog = new THREE.Fog(0x0a0a0d, 22, 60);
 
   const w0 = container.clientWidth, h0 = container.clientHeight || 300;
   const camera = new THREE.PerspectiveCamera(50, w0 / h0, 0.1, 100);
-  camera.position.set(0, 4.5, 13);
-  camera.lookAt(0, 0, 0);
+  camera.position.set(0, 6, 15);
+  camera.lookAt(0, 1.2, 0.3);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -1800,7 +1800,6 @@ function initPipeline3D() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
 
-  // CSS2D label renderer (overlay)
   const labelRenderer = new CSS2DRenderer();
   labelRenderer.setSize(w0, h0);
   labelRenderer.domElement.style.position = 'absolute';
@@ -1809,27 +1808,297 @@ function initPipeline3D() {
   labelRenderer.domElement.style.pointerEvents = 'none';
   container.appendChild(labelRenderer.domElement);
 
-  // RoomEnvironment for soft reflections
+  // Env reflections (giữ pattern cũ)
   try {
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
-  } catch (e) { console.warn('[pipeline-3d] PMREM failed, continue sans env', e); }
+  } catch (e) { console.warn('[pipeline-3d] PMREM failed', e); }
 
-  // Lights — cinematic key + fill
-  scene.add(new THREE.AmbientLight(0x404060, 0.4));
-  const key = new THREE.PointLight(0x4a9eff, 1.0, 25);
-  key.position.set(0, 5, 6);
-  scene.add(key);
-  const fill = new THREE.PointLight(0x22d19a, 0.6, 20);
-  fill.position.set(6, -2, 4);
-  scene.add(fill);
-  const rim = new THREE.PointLight(0xa287f4, 0.4, 18);
-  rim.position.set(-6, 3, -2);
-  scene.add(rim);
+  // --- Lights: hemispheric sky + ambient + directional sun + point accent ---
+  scene.add(new THREE.HemisphereLight(0xbccde8, 0x1a1a26, 0.42));
+  scene.add(new THREE.AmbientLight(0x404060, 0.22));
+  const sun = new THREE.DirectionalLight(0xfff1dc, 0.85);
+  sun.position.set(-8, 14, 10);
+  scene.add(sun);
+  const keyAccent = new THREE.PointLight(0x4a9eff, 0.55, 20);
+  keyAccent.position.set(0, 5, 6);
+  scene.add(keyAccent);
+  const rimAccent = new THREE.PointLight(0xa287f4, 0.4, 18);
+  rimAccent.position.set(-6, 3, -2);
+  scene.add(rimAccent);
 
-  // --- Nodes ---
+  // --- Office floor + grid ---
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(26, 14),
+    new THREE.MeshStandardMaterial({ color: 0x12131a, roughness: 0.85, metalness: 0.1 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+  const grid = new THREE.GridHelper(26, 20, 0x2a2a35, 0x1a1a24);
+  grid.position.y = 0.01;
+  grid.material.transparent = true; grid.material.opacity = 0.4;
+  scene.add(grid);
+
+  // --- Shared materials ---
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0xaaaab2, metalness: 0.75, roughness: 0.3 });
+  const chairMat = new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.8 });
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, metalness: 0.4, roughness: 0.5 });
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xeeeef0, roughness: 0.25, metalness: 0.1 });
+  const shellMat = (hex) => new THREE.MeshStandardMaterial({
+    color: 0x1a1a24, emissive: new THREE.Color(hex),
+    emissiveIntensity: 0.35, roughness: 0.4, metalness: 0.55,
+  });
+
+  // --- Factories: makeRobot / makeDesk / makeChair / makeRack / makePlant / makeRoom ---
+
+  // Humanoid robot: cylinder body + sphere head + visor + eyes + antenna + 2 arms
+  function makeRobot(hex, { isHuman = false, scale = 1 } = {}) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 1.1, 14), shellMat(hex));
+    body.position.y = 0.85;
+    g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 18, 14), headMat.clone());
+    head.position.y = 1.75;
+    g.add(head);
+    // visor — pulse target
+    const visorMat = new THREE.MeshStandardMaterial({ color: 0x07090c, emissive: new THREE.Color(hex), emissiveIntensity: 0.35, roughness: 0.15, metalness: 0.4 });
+    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.39, 18, 10, Math.PI * 0.5 - 0.95, 1.9, 1.15, 0.85), visorMat);
+    head.add(visor);
+    // eyes (emissive dots)
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x9ff0ff });
+    for (const sx of [-0.12, 0.12]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), eyeMat);
+      eye.position.set(sx, 0.02, 0.33);
+      head.add(eye);
+    }
+    // antenna + bulb
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 8), metalMat);
+    ant.position.y = 2.17;
+    g.add(ant);
+    const bulbMat = new THREE.MeshBasicMaterial({ color: hex });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), bulbMat);
+    bulb.position.y = 2.35;
+    g.add(bulb);
+    // arms
+    const arms = [];
+    for (const sx of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.85, 8), shellMat(hex));
+      arm.position.set(sx * 0.52, 0.85, 0);
+      arm.rotation.z = sx * 0.08;
+      g.add(arm);
+      arms.push(arm);
+    }
+    if (isHuman) {
+      const crown = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3, 0.26, 0.16, 6, 1, true),
+        new THREE.MeshStandardMaterial({ color: 0xecc970, emissive: 0xecc970, emissiveIntensity: 0.55, side: THREE.DoubleSide, metalness: 0.6, roughness: 0.3 })
+      );
+      crown.position.y = 2.1;
+      g.add(crown);
+    }
+    g.scale.setScalar(scale);
+    return { group: g, body, head, bulb, bulbMat, arms, visor, visorMat };
+  }
+
+  // Desk + monitor glow
+  function makeDesk(x, z, { screenHex = 0x4a9eff, color = 0x5a3a22 } = {}) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    const topMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.07, 0.85), topMat);
+    top.position.y = 1.05;
+    g.add(top);
+    for (const sx of [-0.65, 0.65]) for (const sz of [-0.35, 0.35]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.02, 0.07), legMat);
+      leg.position.set(sx, 0.5, sz);
+      g.add(leg);
+    }
+    const monBack = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.52, 0.05), new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.3, metalness: 0.3 }));
+    monBack.position.set(0, 1.46, -0.22);
+    g.add(monBack);
+    const screenMat = new THREE.MeshStandardMaterial({ color: 0x050607, emissive: new THREE.Color(screenHex), emissiveIntensity: 0.6, roughness: 0.2 });
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.44), screenMat);
+    screen.position.set(0, 1.46, -0.195);
+    g.add(screen);
+    const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.04), legMat);
+    monStand.position.set(0, 1.17, -0.22);
+    g.add(monStand);
+    const monBase = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.18), legMat);
+    monBase.position.set(0, 1.09, -0.22);
+    g.add(monBase);
+    return { group: g, screen, screenMat };
+  }
+
+  // Chair — 5-leg office chair
+  function makeChair(x, z, facing = 0) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.rotation.y = facing;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.55), chairMat);
+    seat.position.y = 0.55;
+    g.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.07), chairMat);
+    back.position.set(0, 0.9, 0.24);
+    g.add(back);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 8), metalMat);
+    pole.position.y = 0.28;
+    g.add(pole);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.05), metalMat);
+      leg.position.set(Math.cos(a) * 0.14, 0.05, Math.sin(a) * 0.14);
+      leg.rotation.y = -a;
+      g.add(leg);
+    }
+    return g;
+  }
+
+  // Server rack with LED grid
+  function makeRack(x, z, hex = 0x22d19a) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 2.2, 0.6),
+      new THREE.MeshStandardMaterial({ color: 0x121418, metalness: 0.6, roughness: 0.4 })
+    );
+    body.position.y = 1.1;
+    g.add(body);
+    const leds = [];
+    for (let i = 0; i < 10; i++) {
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: hex }));
+      led.position.set((i % 2) * 0.5 - 0.25, 0.5 + Math.floor(i / 2) * 0.33, 0.31);
+      g.add(led);
+      leds.push(led);
+    }
+    return { group: g, leds };
+  }
+
+  // Potted plant for corner decor
+  function makePlant(x, z, scale = 1) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.scale.setScalar(scale);
+    const pot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.2, 0.4, 14),
+      new THREE.MeshStandardMaterial({ color: 0xd4c8b8, roughness: 0.6 })
+    );
+    pot.position.y = 0.2;
+    g.add(pot);
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 8, 6),
+        new THREE.MeshStandardMaterial({ color: i % 2 ? 0x3f7d4f : 0x2f6a40, roughness: 0.75 })
+      );
+      leaf.scale.set(0.4, 1.1, 0.3);
+      leaf.rotation.set(Math.cos(a) * 0.4, a, Math.sin(a) * 0.4);
+      leaf.position.set(Math.cos(a) * 0.15, 0.6 + (i % 3) * 0.08, Math.sin(a) * 0.15);
+      g.add(leaf);
+    }
+    return g;
+  }
+
+  // Room: floor tile + 3 walls (open front) + carpet accent + label + spot
+  function makeRoom(cx, cz, w, d, hex, label) {
+    const g = new THREE.Group();
+    g.position.set(cx, 0, cz);
+    const tile = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.MeshStandardMaterial({ color: 0x16161e, emissive: new THREE.Color(hex), emissiveIntensity: 0.05, roughness: 0.9, metalness: 0.1 })
+    );
+    tile.rotation.x = -Math.PI / 2;
+    tile.position.y = 0.015;
+    g.add(tile);
+    const roomWallMat = new THREE.MeshStandardMaterial({
+      color: 0x18181f, emissive: new THREE.Color(hex), emissiveIntensity: 0.1,
+      roughness: 0.85, metalness: 0.1, transparent: true, opacity: 0.72,
+    });
+    const walls = [];
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w, 1.6, 0.08), roomWallMat);
+    back.position.set(0, 0.8, -d / 2);
+    g.add(back); walls.push(back);
+    for (const sx of [-1, 1]) {
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, d), roomWallMat);
+      sw.position.set(sx * w / 2, 0.8, 0);
+      g.add(sw); walls.push(sw);
+    }
+    const carpet = new THREE.Mesh(
+      new THREE.PlaneGeometry(w * 0.55, d * 0.6),
+      new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), emissive: new THREE.Color(hex), emissiveIntensity: 0.22, roughness: 0.95, transparent: true, opacity: 0.32 })
+    );
+    carpet.rotation.x = -Math.PI / 2;
+    carpet.position.y = 0.03;
+    g.add(carpet);
+    const el = document.createElement('div');
+    el.style.cssText = `font-family:"JetBrains Mono",monospace; font-size:8px; letter-spacing:0.15em; text-transform:uppercase; color:#${hex.toString(16).padStart(6, '0')}; opacity:0.78; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap;`;
+    el.textContent = label;
+    const lab = new CSS2DObject(el);
+    lab.position.set(0, 1.78, -d / 2 + 0.12);
+    g.add(lab);
+    // SpotLight từ trần per phòng
+    const spot = new THREE.SpotLight(hex, 0.5, 9, Math.PI / 5, 0.35, 1);
+    spot.position.set(0, 4, 0);
+    spot.target.position.set(0, 0, 0);
+    g.add(spot);
+    g.add(spot.target);
+    scene.add(g);
+    return { group: g, walls, roomWallMat, carpet, spot };
+  }
+
+  // --- Build 5 phòng ---
+  const rooms = {
+    ceo:    makeRoom(-9,   -0.3, 3.2, 3.2, 0xecc970, 'phòng giám đốc'),
+    claude: makeRoom(-4,   -0.3, 5.8, 3.2, 0xd9734a, 'studio claude'),
+    dev:    makeRoom( 1.5, -0.3, 5.4, 3.2, 0xff5c5a, 'phòng dev · debug'),
+    test:   makeRoom( 6.5, -0.3, 3.6, 3.2, 0x4ad9e4, 'phòng verify · test'),
+    sub:    makeRoom( 0,    3.0, 7.6, 2.8, 0xf58cb5, 'khu subagent · codex'),
+  };
+
+  // --- Furniture + decor ---
+  const decor = { desks: [], chairs: [], racks: [], plants: [] };
+
+  // Phòng Giám đốc (ba)
+  const ceoDesk = makeDesk(-9, 0.4, { screenHex: 0xecc970, color: 0x5a3a22 });
+  scene.add(ceoDesk.group); decor.desks.push(ceoDesk);
+  scene.add(makeChair(-9, -0.5, Math.PI));
+  scene.add(makePlant(-10.3, 0.5, 0.85));
+
+  // Studio Claude: 2 desks (claude main + tool bus)
+  const cDesk = makeDesk(-5.5, 0.4, { screenHex: 0x4a9eff });
+  scene.add(cDesk.group); decor.desks.push(cDesk);
+  scene.add(makeChair(-5.5, -0.5, Math.PI));
+  const toolDesk = makeDesk(-2.3, 0.4, { screenHex: 0xa287f4 });
+  scene.add(toolDesk.group); decor.desks.push(toolDesk);
+  scene.add(makeChair(-2.3, -0.5, Math.PI));
+  scene.add(makePlant(-6.5, 0.5, 0.75));
+
+  // Phòng Dev · Debug: review + debug desks + rack
+  const revDesk = makeDesk(0.3, 0.4, { screenHex: 0xffb547 });
+  scene.add(revDesk.group); decor.desks.push(revDesk);
+  const dbgDesk = makeDesk(2.7, 0.4, { screenHex: 0xff5c5a });
+  scene.add(dbgDesk.group); decor.desks.push(dbgDesk);
+  const devRack = makeRack(4.0, 0.5, 0xff5c5a);
+  scene.add(devRack.group); decor.racks.push(devRack);
+
+  // Phòng Verify · Test: 2 desks + plant
+  const verDesk = makeDesk(5.5, 0.4, { screenHex: 0x4ad9e4 });
+  scene.add(verDesk.group); decor.desks.push(verDesk);
+  const tstDesk = makeDesk(7.5, 0.4, { screenHex: 0x22d19a });
+  scene.add(tstDesk.group); decor.desks.push(tstDesk);
+  scene.add(makePlant(8.1, 0.5, 0.75));
+
+  // Khu subagent (sub-row behind): 3 desks + codex rack
+  for (const sx of [-2.3, 0.3, 2.7]) {
+    const d = makeDesk(sx, 3.2, { screenHex: 0xf58cb5 });
+    scene.add(d.group); decor.desks.push(d);
+  }
+  const codexRack = makeRack(-3.2, 3.5, 0xffb547);
+  scene.add(codexRack.group); decor.racks.push(codexRack);
+
+  // --- Nodes (glow + optional robot bodies) ---
   const nodes = {};
+  const robots = {};
 
   function makeLabel(cfg) {
     const el = document.createElement('div');
@@ -1856,6 +2125,7 @@ function initPipeline3D() {
     return new CSS2DObject(el);
   }
 
+  // Plain geometry node (think, tool, review, debug, verify, test, loops, result)
   function makeNode(id, geo, hex, pos, labelCfg) {
     const mat = new THREE.MeshStandardMaterial({
       color: 0x1a1a24,
@@ -1866,9 +2136,8 @@ function initPipeline3D() {
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(...pos);
-    mesh.userData = { baseEmissive: 0.55, hex };
+    mesh.userData = { baseEmissive: 0.55, hex, isRobot: false };
     scene.add(mesh);
-
     if (labelCfg) {
       const label = makeLabel(labelCfg);
       const bbox = new THREE.Box3().setFromObject(mesh);
@@ -1880,39 +2149,67 @@ function initPipeline3D() {
     return mesh;
   }
 
+  // Robot node — place humanoid at (x, 0, z); visor is pulse target
+  function makeRobotNode(id, hex, pos, labelCfg, { isHuman = false, scale = 1.1 } = {}) {
+    const [x, , z] = pos;
+    const bot = makeRobot(hex, { isHuman, scale });
+    bot.group.position.set(x, 0, z);
+    scene.add(bot.group);
+    bot.visor.userData = { baseEmissive: 0.35, hex, isRobot: true, group: bot.group, baseScale: scale };
+    nodes[id] = bot.visor;
+    robots[id] = { ...bot, hex, phase: Math.random() * Math.PI * 2, ready: false };
+    if (labelCfg) {
+      const label = makeLabel(labelCfg);
+      label.position.set(0, 2.75, 0);
+      bot.group.add(label);
+    }
+    return bot.visor;
+  }
+
   // Geometries
-  const sphereGeo = new THREE.SphereGeometry(0.55, 24, 16);
-  const toolGeo = new THREE.BoxGeometry(1.8, 0.9, 0.5);
-  const claudeGeo = new THREE.BoxGeometry(1.6, 0.9, 0.5);
-  const smallGeo = new THREE.BoxGeometry(1.2, 0.65, 0.4);
-  const subGeo = new THREE.BoxGeometry(1.5, 0.55, 0.4);
-  const resultGeo = new THREE.BoxGeometry(1.4, 0.65, 0.4);
-  const knotGeo = new THREE.TorusKnotGeometry(0.38, 0.11, 56, 10);
-  const torusGeo = new THREE.TorusGeometry(0.45, 0.14, 14, 32);
+  const toolGeo = new THREE.BoxGeometry(1.3, 0.55, 0.4);
+  const smallGeo = new THREE.BoxGeometry(0.95, 0.5, 0.35);
+  const resultGeo = new THREE.BoxGeometry(1.15, 0.55, 0.4);
+  const knotGeo = new THREE.TorusKnotGeometry(0.3, 0.09, 48, 10);
+  const torusGeo = new THREE.TorusGeometry(0.4, 0.12, 12, 28);
 
-  // Layout: X spread across linear flow
-  makeNode('node-user',   sphereGeo, 0x4a9eff, [-10, 1.8, 0],    { title: 'ba', sub: 'prompt', titleColor: '#4a9eff' });
-  makeNode('node-claude', claudeGeo, 0x4a9eff, [-7.3, 1.8, 0],   { title: 'claude main', subId: 'n-claude-sub', sub: 'harness', extraId: 'n-claude-turns', extra: '0 turns', titleColor: '#4a9eff' });
-  makeNode('node-think',  knotGeo,   0xa287f4, [-4.8, 1.8, 0],   { title: '💭 thinking', subId: 'n-think-tokens', sub: '0 tok', titleColor: '#a287f4' });
-  makeNode('node-tool',   toolGeo,   0x4a9eff, [-2.3, 1.8, 0],   { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' });
-  makeNode('node-review', smallGeo,  0xffb547, [0.3, 1.8, 0],    { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' });
-  makeNode('node-debug',  smallGeo,  0xff5c5a, [2.7, 1.8, 0],    { title: '🐞 debug', subId: 'n-debug', sub: '0 errors', titleColor: '#ff5c5a' });
-  makeNode('node-verify', smallGeo,  0x4ad9e4, [5.1, 1.8, 0],    { title: '✓ verify', subId: 'n-verify', sub: '0 pass', titleColor: '#4ad9e4' });
-  makeNode('node-test',   smallGeo,  0x22d19a, [7.5, 1.8, 0],    { title: '🧪 test', subId: 'n-test', sub: '0 run', titleColor: '#22d19a' });
-  makeNode('node-agent',  subGeo,    0xf58cb5, [-2.3, -2.3, 1.2],{ title: '👥 subagents', subId: 'n-agent-count', sub: '0 spawned', titleColor: '#f58cb5' });
-  makeNode('node-bg',     subGeo,    0xffb547, [0.3, -2.3, 1.2], { title: '⚙ background', subId: 'n-bg-count', sub: '0 running', titleColor: '#ffb547' });
-  makeNode('node-loops',  torusGeo,  0xa287f4, [2.7, -2.3, 1.2], { title: '↻ loops', subId: 'n-loops', sub: '1 watch', titleColor: '#a287f4' });
-  makeNode('node-result', resultGeo, 0x22d19a, [7.5, -2.3, 0],   { title: '→ ba', subId: 'n-result-sub', sub: 'answer', titleColor: '#22d19a' });
+  // Main row robots: ba + claude
+  makeRobotNode('node-user',   0xecc970, [-9,   0, -0.1], { title: 'ba', sub: 'prompt', titleColor: '#ecc970' }, { isHuman: true, scale: 1.15 });
+  makeRobotNode('node-claude', 0x4a9eff, [-5.5, 0, -0.1], { title: 'claude main', subId: 'n-claude-sub', sub: 'harness', extraId: 'n-claude-turns', extra: '0 turns', titleColor: '#4a9eff' }, { scale: 1.2 });
+  // Think orb floats above claude
+  makeNode('node-think',  knotGeo,   0xa287f4, [-5.5, 2.9, -0.1], { title: '💭 thinking', subId: 'n-think-tokens', sub: '0 tok', titleColor: '#a287f4' });
+  // Tool bus (desk-top device)
+  makeNode('node-tool',   toolGeo,   0x4a9eff, [-2.3, 1.75, -0.1], { title: 'tool bus', titleId: 'n-tool-name', subId: 'n-tool-sub', sub: 'idle', extraId: 'n-tool-count', extra: '0 calls', titleColor: '#4a9eff' });
+  // Stations: review, debug, verify, test (floating screen above desk)
+  makeNode('node-review', smallGeo,  0xffb547, [0.3, 1.75, -0.1], { title: '🔍 review', subId: 'n-review', sub: 'pending', titleColor: '#ffb547' });
+  makeNode('node-debug',  smallGeo,  0xff5c5a, [2.7, 1.75, -0.1], { title: '🐞 debug', subId: 'n-debug', sub: '0 errors', titleColor: '#ff5c5a' });
+  makeNode('node-verify', smallGeo,  0x4ad9e4, [5.5, 1.75, -0.1], { title: '✓ verify', subId: 'n-verify', sub: '0 pass', titleColor: '#4ad9e4' });
+  makeNode('node-test',   smallGeo,  0x22d19a, [7.5, 1.75, -0.1], { title: '🧪 test', subId: 'n-test', sub: '0 run', titleColor: '#22d19a' });
+  // Sub-row robots: subagents + background
+  makeRobotNode('node-agent', 0xf58cb5, [-2.3, 0, 3.1], { title: '👥 subagents', subId: 'n-agent-count', sub: '0 spawned', titleColor: '#f58cb5' }, { scale: 0.9 });
+  makeRobotNode('node-bg',    0xffb547, [0.3,  0, 3.1], { title: '⚙ background', subId: 'n-bg-count', sub: '0 running', titleColor: '#ffb547' }, { scale: 0.9 });
+  // Loops torus floats
+  makeNode('node-loops',  torusGeo,  0xa287f4, [2.7, 2.3, 3.1], { title: '↻ loops', subId: 'n-loops', sub: '1 watch', titleColor: '#a287f4' });
+  // Result monitor
+  makeNode('node-result', resultGeo, 0x22d19a, [7.5, 1.75, 3.1], { title: '→ ba', subId: 'n-result-sub', sub: 'answer', titleColor: '#22d19a' });
 
-  // --- Edges ---
+  // --- Edges (world-position aware for robot visor nested under group) ---
   const edges = {};
+  const _tmpA = new THREE.Vector3(), _tmpB = new THREE.Vector3();
   function addEdge(id, fromId, toId, opts = {}) {
     const nf = nodes[fromId], nt = nodes[toId];
     if (!nf || !nt) return;
-    const from = nf.position.clone(), to = nt.position.clone();
+    nf.updateWorldMatrix(true, false);
+    nt.updateWorldMatrix(true, false);
+    const from = nf.getWorldPosition(_tmpA.clone());
+    const to = nt.getWorldPosition(_tmpB.clone());
     let points;
     if (opts.curve) {
-      const mid = new THREE.Vector3((from.x + to.x) / 2, (from.y + to.y) / 2 + (opts.curveY ?? 1.0), (from.z + to.z) / 2 + (opts.curveZ ?? 0));
+      const mid = new THREE.Vector3(
+        (from.x + to.x) / 2,
+        (from.y + to.y) / 2 + (opts.curveY ?? 1.0),
+        (from.z + to.z) / 2 + (opts.curveZ ?? 0)
+      );
       points = [from, mid, to];
     } else {
       points = [from, to];
@@ -1922,76 +2219,50 @@ function initPipeline3D() {
     const mat = new THREE.LineBasicMaterial({
       color: opts.color || 0x4a4a55,
       transparent: true,
-      opacity: opts.opacity ?? 0.55,
+      opacity: opts.opacity ?? 0.5,
     });
     const line = new THREE.Line(geo, mat);
     scene.add(line);
-    edges[id] = { line, curve, baseColor: opts.color || 0x4a4a55, baseOpacity: opts.opacity ?? 0.55 };
+    edges[id] = { line, curve, baseColor: opts.color || 0x4a4a55, baseOpacity: opts.opacity ?? 0.5 };
   }
 
   // Main flow
-  addEdge('edge-u-c',         'node-user',   'node-claude');
-  addEdge('edge-c-think',     'node-claude', 'node-think');
-  addEdge('edge-think-t',     'node-think',  'node-tool');
-  addEdge('edge-c-t',         'node-claude', 'node-tool',   { curve: true, curveY: 1.6, opacity: 0.25 });
-  addEdge('edge-t-review',    'node-tool',   'node-review');
-  addEdge('edge-review-debug','node-review', 'node-debug');
-  addEdge('edge-debug-verify','node-debug',  'node-verify');
-  addEdge('edge-verify-test', 'node-verify', 'node-test');
-  // Side (tool → subagents/bg/loops)
-  addEdge('edge-t-a',         'node-tool',   'node-agent',  { curve: true, curveY: -0.4, curveZ: 0.6 });
-  addEdge('edge-t-b',         'node-tool',   'node-bg',     { curve: true, curveY: -0.6, curveZ: 0.6 });
-  addEdge('edge-t-loops',     'node-tool',   'node-loops',  { curve: true, curveY: -0.8, curveZ: 0.6 });
-  // Result + loop back
-  addEdge('edge-test-r',      'node-test',   'node-result');
-  addEdge('edge-t-r',         'node-tool',   'node-result', { curve: true, curveY: -2.2, curveZ: 0.4, opacity: 0.3 });
-  addEdge('edge-loop-back',   'node-debug',  'node-tool',   { curve: true, curveY: 2.5, color: 0xff5c5a, opacity: 0.4 });
-  addEdge('edge-r-u',         'node-result', 'node-user',   { curve: true, curveY: -3.0, color: 0x22d19a, opacity: 0.3 });
+  addEdge('edge-u-c',          'node-user',   'node-claude');
+  addEdge('edge-c-think',      'node-claude', 'node-think',  { curve: true, curveY: 0.5 });
+  addEdge('edge-think-t',      'node-think',  'node-tool',   { curve: true, curveY: -0.3 });
+  addEdge('edge-c-t',          'node-claude', 'node-tool',   { curve: true, curveY: 1.6, opacity: 0.25 });
+  addEdge('edge-t-review',     'node-tool',   'node-review');
+  addEdge('edge-review-debug', 'node-review', 'node-debug');
+  addEdge('edge-debug-verify', 'node-debug',  'node-verify');
+  addEdge('edge-verify-test',  'node-verify', 'node-test');
+  addEdge('edge-t-a',          'node-tool',   'node-agent',  { curve: true, curveY: 0.3, curveZ: 1.0 });
+  addEdge('edge-t-b',          'node-tool',   'node-bg',     { curve: true, curveY: 0.3, curveZ: 1.2 });
+  addEdge('edge-t-loops',      'node-tool',   'node-loops',  { curve: true, curveY: 0.5, curveZ: 1.5 });
+  addEdge('edge-test-r',       'node-test',   'node-result', { curve: true, curveY: 0.3, curveZ: 1.0 });
+  addEdge('edge-t-r',          'node-tool',   'node-result', { curve: true, curveY: 1.3, curveZ: 1.5, opacity: 0.3 });
+  addEdge('edge-loop-back',    'node-debug',  'node-tool',   { curve: true, curveY: 2.0, color: 0xff5c5a, opacity: 0.4 });
+  addEdge('edge-r-u',          'node-result', 'node-user',   { curve: true, curveY: -0.8, color: 0x22d19a, opacity: 0.3 });
 
-  // --- Phòng ảo (van-phong-ao-3d pattern) — wireframe rooms behind stage nodes ---
-  const phongs = {};
-  function makePhong(stage, pos, size, hex, labelText) {
-    const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);
-    const edgeGeo = new THREE.EdgesGeometry(geo);
-    const mat = new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: 0.28 });
-    const frame = new THREE.LineSegments(edgeGeo, mat);
-    frame.position.set(...pos);
-    frame.userData = { stage, baseOp: 0.28, hex };
-    scene.add(frame);
-    const rug = new THREE.Mesh(
-      new THREE.BoxGeometry(size[0] - 0.1, 0.04, size[2] - 0.1),
-      new THREE.MeshStandardMaterial({ color: 0x12121a, emissive: new THREE.Color(hex), emissiveIntensity: 0.06, roughness: 0.9 })
-    );
-    rug.position.set(pos[0], pos[1] - size[1] / 2 + 0.02, pos[2]);
-    scene.add(rug);
-    frame.userData.rug = rug;
-    const el = document.createElement('div');
-    const colHex = '#' + hex.toString(16).padStart(6, '0');
-    el.style.cssText = `font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:${colHex}; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:none; white-space:nowrap; opacity:0.75;`;
-    el.textContent = labelText;
-    const lab = new CSS2DObject(el);
-    lab.position.set(0, size[1] / 2 + 0.15, 0);
-    frame.add(lab);
-    phongs[stage] = frame;
-  }
-  makePhong('review', [0.3,  1.0, -1.8], [2.0, 2.4, 1.4], 0xffb547, 'phòng kiểm tra');
-  makePhong('debug',  [2.7,  1.0, -1.8], [2.0, 2.4, 1.4], 0xff5c5a, 'phòng dev');
-  makePhong('verify', [5.1,  1.0, -1.8], [2.0, 2.4, 1.4], 0x4ad9e4, 'phòng test');
-  phongs['test'] = phongs['verify']; // test shares phong-test với verify
-  // Khu Codex placeholder (bg_tasks)
-  makePhong('codex',  [-0.5, -2.6, 2.5], [3.2, 1.8, 1.3], 0xffb547, 'khu codex');
+  // Stage → room mapping (for flashPhong)
+  const phongs = {
+    review: rooms.dev,
+    debug:  rooms.dev,
+    verify: rooms.test,
+    test:   rooms.test,
+    codex:  rooms.sub,
+  };
 
   // --- OrbitControls ---
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.autoRotate = false;
   controls.enableZoom = true;
   controls.enablePan = false;
-  controls.minDistance = 7;
-  controls.maxDistance = 28;
-  controls.maxPolarAngle = Math.PI * 0.75;
-  controls.target.set(0, 0, 0);
+  controls.minDistance = 8;
+  controls.maxDistance = 30;
+  controls.minPolarAngle = 0.3;
+  controls.maxPolarAngle = 1.4;
+  controls.target.set(0, 1.2, 0.3);
 
   // --- Resize ---
   function onResize() {
@@ -2002,41 +2273,99 @@ function initPipeline3D() {
     labelRenderer.setSize(w, h);
   }
   window.addEventListener('resize', onResize);
-  // Also observe container size changes
   if (window.ResizeObserver) new ResizeObserver(onResize).observe(container);
 
   // --- Animation loop ---
   const spinSet = ['node-think', 'node-loops'];
+  const screenMats = decor.desks.map(d => d.screenMat);
+  const now0 = Date.now();
+  const screenNextFlicker = screenMats.map(() => now0 + 500 + Math.random() * 2000);
+  const screenBase = screenMats.map(sm => sm.emissiveIntensity);
+  // LED timers (flat)
+  const ledEntries = [];
+  for (const rack of decor.racks) for (const led of rack.leds) {
+    ledEntries.push({ led, next: now0 + 400 + Math.random() * 1600 });
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
-    // Emissive decay toward baseEmissive
+    const now = Date.now(), t = now * 0.001;
+
+    // Node emissive decay toward base
     for (const id in nodes) {
       const m = nodes[id];
       const base = m.userData.baseEmissive;
       if (m.material.emissiveIntensity > base) {
         m.material.emissiveIntensity = Math.max(base, m.material.emissiveIntensity - 0.04);
       }
-      if (spinSet.includes(id)) {
+      // Spin for floating orbs (think, loops)
+      if (!m.userData.isRobot && spinSet.includes(id)) {
         m.rotation.y += 0.018;
         m.rotation.x += 0.009;
       }
     }
+
+    // Robots: idle breathe (scale.y) + head look-around + bulb pulse
+    for (const key in robots) {
+      const r = robots[key];
+      if (!r.ready) continue;
+      const phase = r.phase + t;
+      const bs = nodes[key].userData.baseScale || 1.1;
+      const breathe = 1 + Math.sin(phase * 0.9) * 0.025;
+      r.group.scale.y = bs * breathe;
+      r.head.rotation.y = Math.sin(phase * 0.4) * 0.18;
+      // Bulb emissive-style pulse (BasicMaterial — swap intensity via color brightness)
+      const bInt = 0.6 + (Math.sin(phase * 1.5) * 0.4 + 0.4);
+      r.bulbMat.color.setHex(r.hex);
+      r.bulbMat.color.multiplyScalar(Math.min(1.2, bInt));
+    }
+
+    // Screen flicker (random intensity 0.4-1.0)
+    screenMats.forEach((sm, i) => {
+      if (now > screenNextFlicker[i]) {
+        sm.emissiveIntensity = 0.4 + Math.random() * 0.6;
+        screenNextFlicker[i] = now + 1500 + Math.random() * 2500;
+      }
+    });
+
+    // LED blink
+    for (const e of ledEntries) {
+      if (now > e.next) {
+        e.led.visible = !e.led.visible;
+        e.next = now + 400 + Math.random() * 1600;
+      }
+    }
+
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
   }
   animate();
 
-  // Entrance anim via GSAP
+  // Entrance anim via GSAP (non-robot scale; robot via group scale)
   if (window.gsap) {
-    const meshes = Object.values(nodes);
-    meshes.forEach(m => { m.scale.set(0.01, 0.01, 0.01); });
-    gsap.to(meshes.map(m => m.scale), { x: 1, y: 1, z: 1, duration: 0.7, stagger: 0.06, ease: 'back.out(1.5)', delay: 0.2 });
+    for (const id in nodes) {
+      const m = nodes[id];
+      if (m.userData.isRobot) continue;
+      m.scale.set(0.01, 0.01, 0.01);
+      gsap.to(m.scale, { x: 1, y: 1, z: 1, duration: 0.7, delay: 0.2 + Math.random() * 0.3, ease: 'back.out(1.5)' });
+    }
+    for (const key in robots) {
+      const r = robots[key];
+      const bs = nodes[key].userData.baseScale || 1.1;
+      r.group.scale.set(0.01, 0.01, 0.01);
+      gsap.to(r.group.scale, {
+        x: bs, y: bs, z: bs,
+        duration: 0.8, delay: 0.3 + Math.random() * 0.2, ease: 'back.out(1.4)',
+        onComplete: () => { r.ready = true; }
+      });
+    }
+  } else {
+    // Without gsap: robots ready immediately
+    for (const key in robots) robots[key].ready = true;
   }
 
-  // --- Hook overrides for existing dashboard code ---
-  // Script scope function declarations in dashboard.html's main <script> are attached to window
-  // (plain script, no "use strict", no type="module"), so we can reassign.
+  // --- Hook overrides ---
 
   window.pulseNode = function(nodeId, colorStr) {
     const m = nodes[nodeId];
@@ -2044,12 +2373,19 @@ function initPipeline3D() {
     const c = new THREE.Color(colorStr || '#4a9eff');
     m.material.emissive.copy(c);
     m.material.emissiveIntensity = 2.4;
-    if (window.gsap) {
+    if (m.userData.isRobot) {
+      // Robot: flash bulb bright + brief head nod (don't fight idle breathe on group.scale)
+      const r = robots[nodeId];
+      if (r && window.gsap) {
+        r.bulbMat.color.setHex(c.getHex());
+        gsap.fromTo(r.bulb.scale, { x: 1, y: 1, z: 1 }, { x: 2, y: 2, z: 2, duration: 0.3, yoyo: true, repeat: 1, ease: 'power2.out', overwrite: true });
+      }
+    } else if (window.gsap) {
       gsap.fromTo(m.scale, { x: 1, y: 1, z: 1 }, { x: 1.35, y: 1.35, z: 1.35, duration: 0.28, yoyo: true, repeat: 1, ease: 'power2.out', overwrite: true });
     }
   };
 
-  const particleGeo = new THREE.SphereGeometry(0.15, 12, 8);
+  const particleGeo = new THREE.SphereGeometry(0.14, 12, 8);
   window.emitParticle = function(edgeId, colorStr) {
     const edge = edges[edgeId];
     if (!edge) return;
@@ -2065,7 +2401,6 @@ function initPipeline3D() {
     });
     const p = new THREE.Mesh(particleGeo, mat);
     scene.add(p);
-    // Edge flash
     const line = edge.line;
     const origCol = edge.baseColor, origOp = edge.baseOpacity;
     line.material.color.set(col);
@@ -2093,6 +2428,10 @@ function initPipeline3D() {
     }
   };
 
+  // Tool bus sustained: node glow + claude head down (work pose) + tool desk screen bright
+  const claudeRobotRef = robots['node-claude'];
+  const toolDeskScreenMat = toolDesk.screenMat;
+  const toolDeskScreenBase = toolDeskScreenMat.emissiveIntensity;
   window.sustainToolNode = function(on) {
     const m = nodes['node-tool'];
     if (!m) return;
@@ -2100,20 +2439,28 @@ function initPipeline3D() {
     if (m.material.emissiveIntensity < m.userData.baseEmissive) {
       m.material.emissiveIntensity = m.userData.baseEmissive;
     }
-  };
-
-  // Flash phòng ảo khi stage trigger — van-phong-ao-3d pattern
-  window.flashPhong = function(stage) {
-    const f = phongs[stage]; if (!f) return;
-    f.material.opacity = 1.0;
-    if (f.userData.rug) {
-      f.userData.rug.material.emissiveIntensity = 0.9;
-      if (window.gsap) gsap.to(f.userData.rug.material, { emissiveIntensity: 0.06, duration: 1.2, ease: 'power2.out' });
+    if (claudeRobotRef && window.gsap) {
+      gsap.to(claudeRobotRef.head.rotation, { x: on ? 0.5 : 0, duration: 0.6, ease: 'power2.inOut', overwrite: true });
     }
-    if (window.gsap) gsap.to(f.material, { opacity: f.userData.baseOp, duration: 1.0, ease: 'power2.out' });
+    toolDeskScreenMat.emissiveIntensity = on ? 1.2 : toolDeskScreenBase;
   };
 
-  console.log('[pipeline-3d] ready — 12 nodes · 15 edges · fog + ACES tonemap · RoomEnvironment · 4 phong ao');
+  // flashPhong: bump walls emissive + spot intensity for the stage's room
+  window.flashPhong = function(stage) {
+    const room = phongs[stage]; if (!room) return;
+    room.roomWallMat.emissiveIntensity = 0.55;
+    room.carpet.material.emissiveIntensity = 0.6;
+    if (window.gsap) {
+      gsap.to(room.roomWallMat, { emissiveIntensity: 0.1, duration: 1.2, ease: 'power2.out', overwrite: true });
+      gsap.to(room.carpet.material, { emissiveIntensity: 0.22, duration: 1.2, ease: 'power2.out', overwrite: true });
+    }
+    if (room.spot) {
+      room.spot.intensity = 1.6;
+      if (window.gsap) gsap.to(room.spot, { intensity: 0.5, duration: 1.2, ease: 'power2.out', overwrite: true });
+    }
+  };
+
+  console.log('[pipeline-3d] v17 ready — 12 nodes (4 robot humanoid) · 15 edges · 5 phòng · ' + decor.desks.length + ' desks · ' + decor.racks.length + ' racks · spot per phòng');
 }
 </script>
 
