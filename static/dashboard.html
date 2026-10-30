@@ -125,6 +125,21 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .panel-3d-container { width: 100%; height: 200px; position: relative; background: radial-gradient(ellipse at center, rgba(74,158,255,0.03), transparent 70%); border-radius: 12px; overflow: hidden; margin: 6px 0; }
 .panel-3d-container canvas { display: block; }
 .panel-3d-container.webgl-off { display: none; }
+/* Force 3D off cho skills/kinds/loops — gom thành metrics strip compact 2D */
+#skills-3d, #kinds-3d, #loops-3d { display: none !important; }
+.cmd-think-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.cmd-think-row .card { margin: 0 !important; }
+.cmd-think-row .cmds-list, .cmd-think-row .think-list { max-height: 260px; overflow-y: auto; }
+.metrics-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
+.metrics-strip .card { padding: 10px 12px; }
+.metrics-strip .card .lbl { font-size: 10px; margin-bottom: 6px; }
+.metrics-strip .kinds-bar { height: 6px; }
+.metrics-strip .kinds-legend { font-size: 9px; gap: 6px; margin-top: 6px; }
+.metrics-strip .kinds-legend .sw { width: 7px; height: 7px; }
+.metrics-strip #skills-share { font-size: 10px; max-height: 90px; overflow-y: auto; padding-right: 4px; }
+.metrics-strip #loops-list { font-size: 10px; }
+.metrics-strip #hot-path { font-size: 9px; margin-top: 6px; }
+.metrics-strip .loop-row { padding: 3px 0; font-size: 10px; }
 .panel-2d-fallback { display: none; }  /* hidden khi 3D OK */
 .panel-2d-fallback.show-fallback { display: block; }
 
@@ -1588,21 +1603,42 @@ renderEvent = function(ev) {
   }
 };
 
-// Reorder sections: pipeline NGAY DƯỚI hero · commands NGAY DƯỚI pipeline · metadata panels xuống cuối
+// Reorder sections: pipeline → commands → metrics-strip (skills/kinds/loops 2D compact) → rest
 (function reorder() {
   const wrap = document.querySelector('.wrap');
   const pipeline = document.querySelector('.pipeline');
   const hero = document.querySelector('.card.hero');
   if (wrap && pipeline && hero) {
-    // Move pipeline ngay sau hero
     hero.parentNode.insertBefore(pipeline, hero.nextSibling);
-    // Move commands card ngay sau pipeline
     const cmdCard = Array.from(wrap.querySelectorAll('.card')).find(c => {
       const lbl = c.querySelector('.lbl')?.textContent || '';
       return lbl.includes('commands') && lbl.includes('bash');
     });
     if (cmdCard) pipeline.parentNode.insertBefore(cmdCard, pipeline.nextSibling);
-    // Move footer xuống cuối
+
+    // Group Commands + Thinking Content thành 2 cột ngang hàng
+    const thinkCard = document.querySelector('.card.thinking-card');
+    if (cmdCard && thinkCard) {
+      const cmdThinkRow = document.createElement('div');
+      cmdThinkRow.className = 'cmd-think-row';
+      cmdCard.parentNode.insertBefore(cmdThinkRow, cmdCard);
+      cmdThinkRow.appendChild(cmdCard);
+      cmdThinkRow.appendChild(thinkCard);
+    }
+
+    // Group 3 cards (skills + kinds + loops) vào 1 metrics-strip compact
+    const skillsCard = document.getElementById('skills-3d')?.closest('.card');
+    const kindsCard = document.getElementById('kinds-3d')?.closest('.card');
+    const loopsCard = document.getElementById('loops-3d')?.closest('.card');
+    if (skillsCard && kindsCard && loopsCard) {
+      const strip = document.createElement('div');
+      strip.className = 'metrics-strip';
+      skillsCard.parentNode.insertBefore(strip, skillsCard);
+      strip.appendChild(skillsCard);
+      strip.appendChild(kindsCard);
+      strip.appendChild(loopsCard);
+    }
+
     const footer = wrap.querySelector('.footer');
     if (footer) wrap.appendChild(footer);
   }
@@ -2103,16 +2139,22 @@ function initAgentTree3D() {
   window.updateAgentTree3D = function(snapshot) {
     const sub = (snapshot.subagents || []).map(s => ({ ...s, _kind: 'fork', _key: 'fork:' + (s.name || s.id || JSON.stringify(s)) }));
     const bg  = (snapshot.bg_tasks  || []).map(b => ({ ...b, _kind: 'bg',   _key: 'bg:'   + (b.name || b.id || JSON.stringify(b)) }));
-    const items = [...sub, ...bg];
+    const allItems = [...sub, ...bg];
+    // Max 8 items visible, rest aggregated vào "+N more"
+    const MAX_VISIBLE = 8;
+    const extraCount = Math.max(0, allItems.length - MAX_VISIBLE);
+    const items = allItems.slice(0, MAX_VISIBLE);
+    if (extraCount > 0) items.push({ _kind: 'more', _key: '_more_', name: `+${extraCount} khác`, status: 'idle' });
     const seen = new Set();
-    const r = 2.0;
+    // Dynamic radius theo count — tránh chồng label
+    const r = Math.max(2.0, 1.5 + items.length * 0.18);
     items.forEach((item, i) => {
       const theta = (i / Math.max(1, items.length)) * Math.PI * 2;
       const key = item._key;
       seen.add(key);
       let entry = orbMeshes.get(key);
       if (!entry) {
-        const hex = subColors[item._kind] || 0x4a9eff;
+        const hex = item._kind === 'more' ? 0x6a6a73 : (subColors[item._kind] || 0x4a9eff);
         const mat = new THREE.MeshStandardMaterial({
           color: 0x151521, emissive: hex, emissiveIntensity: 0.7,
           roughness: 0.3, metalness: 0.5
@@ -2121,26 +2163,25 @@ function initAgentTree3D() {
         orbitGroup.add(mesh);
         const el = document.createElement('div');
         const colHex = '#' + hex.toString(16).padStart(6, '0');
-        el.style.cssText = `color:${colHex}; font-family:"JetBrains Mono",monospace; font-size:9px; text-shadow:0 1px 3px rgba(0,0,0,0.9); pointer-events:auto; cursor:pointer; white-space:nowrap; padding:1px 4px; border-radius:3px;`;
-        el.textContent = (item.name || item._kind).slice(0, 16);
-        el.title = `${item._kind} · ${item.status || 'running'}`;
-        el.addEventListener('click', () => {
-          el.style.background = 'rgba(74,158,255,0.3)';
-          setTimeout(() => el.style.background = '', 1000);
-        });
+        el.style.cssText = `color:${colHex}; font-family:"JetBrains Mono",monospace; font-size:8px; background:rgba(10,10,13,0.75); padding:1px 5px; border-radius:3px; pointer-events:auto; cursor:help; white-space:nowrap; border:0.5px solid rgba(255,255,255,0.08);`;
+        const shortName = (item.name || item._kind).slice(0, 10);
+        el.textContent = shortName + (item.name && item.name.length > 10 ? '…' : '');
+        el.title = `${item._kind} · ${item.name || ''} · ${item.status || 'running'}`;
         const lab = new CSS2DObject(el);
-        lab.position.set(0, 0.35, 0);
+        lab.position.set(0, 0.4, 0);
         mesh.add(lab);
         entry = { mesh, label: el, kind: item._kind };
         orbMeshes.set(key, entry);
       }
       entry.mesh.position.set(Math.cos(theta) * r, 0, Math.sin(theta) * r);
-      const statusColor = item.status === 'error' ? 0xff5c5a
-        : (item.status === 'running' ? subColors[item._kind] : 0x6a6a73);
+      const statusColor = item._kind === 'more' ? 0x6a6a73
+        : (item.status === 'error' ? 0xff5c5a
+          : (item.status === 'running' ? (subColors[item._kind] || 0x4a9eff) : 0x6a6a73));
       entry.mesh.material.emissive.setHex(statusColor);
       entry.mesh.material.emissiveIntensity = item.status === 'running' ? 1.0 : 0.4;
-      entry.label.textContent = (item.name || item._kind).slice(0, 16);
-      entry.label.title = `${item._kind} · ${item.status || 'running'}`;
+      const shortName = (item.name || item._kind).slice(0, 10);
+      entry.label.textContent = shortName + (item.name && item.name.length > 10 ? '…' : '');
+      entry.label.title = `${item._kind} · ${item.name || ''} · ${item.status || 'running'}`;
     });
     // Dispose gone
     for (const [k, e] of orbMeshes) {
