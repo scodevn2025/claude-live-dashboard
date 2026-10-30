@@ -199,7 +199,36 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .think-list { font-size: 11px; display: flex; flex-direction: column; gap: 6px; }
 .think-list::-webkit-scrollbar { width: 4px; }
 .think-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
-.think-row { flex-shrink: 0; padding: 8px 10px; background: var(--surface-1); border-left: 2px solid var(--violet); border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+.think-row { flex-shrink: 0; padding: 8px 10px; background: var(--surface-1); border-left: 2px solid var(--violet); border-radius: 4px; font-family: 'JetBrains Mono', monospace; position: relative; }
+/* Thinking mới nhất (row đầu tiên) — animated border glow */
+.think-row:first-child {
+  background: linear-gradient(90deg, rgba(162,135,244,0.08), rgba(74,158,255,0.04));
+  border: 1px solid transparent;
+  border-left: 2px solid var(--violet);
+  box-shadow: 0 0 0 0 rgba(162,135,244,0.5);
+  animation: thinkingPulse 2s ease-in-out infinite;
+}
+.think-row:first-child::before {
+  content: '💭 ĐANG SUY NGHĨ';
+  position: absolute;
+  top: -8px; right: 10px;
+  font-size: 9px;
+  background: var(--violet);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  animation: thinkingBadgeBlink 1.5s ease-in-out infinite;
+}
+@keyframes thinkingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(162,135,244,0.5); border-color: var(--violet); }
+  50% { box-shadow: 0 0 0 6px rgba(162,135,244,0); border-color: rgba(162,135,244,0.3); }
+}
+@keyframes thinkingBadgeBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.95); }
+}
 .think-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 5px; font-size: 10px; color: var(--text-muted); }
 .think-head .think-ts { font-weight: 500; }
 .think-tok { background: rgba(162,135,244,0.15); color: var(--violet); padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 500; }
