@@ -331,6 +331,35 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .edits-list { font-size: 11px; }
 .edits-list::-webkit-scrollbar { width: 4px; }
 .edits-list::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+
+/* Background tasks panel */
+.bg-tasks-card { margin: 16px 0; }
+.bg-tasks-list { max-height: 320px; overflow-y: auto; padding-right: 4px; display: grid; gap: 8px; }
+.bg-task-row {
+  display: grid; grid-template-columns: 24px 1fr auto auto; gap: 10px; align-items: center;
+  padding: 10px 12px; border-radius: 10px; background: var(--surface-2);
+  border: 1px solid var(--border); transition: all 0.15s;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+.bg-task-row:hover { background: var(--surface-3); border-color: var(--border-strong); transform: translateX(2px); }
+.bg-task-row.running { border-left: 3px solid var(--amber); background: linear-gradient(90deg, rgba(255,181,71,0.06), var(--surface-2)); }
+.bg-task-row.done { border-left: 3px solid var(--green); opacity: 0.78; }
+.bg-task-row.error { border-left: 3px solid var(--red); background: rgba(255,92,90,0.06); }
+.bg-task-icon { font-size: 16px; text-align: center; }
+.bg-task-icon.running { color: var(--amber); animation: bgSpin 2s linear infinite; }
+.bg-task-icon.done { color: var(--green); }
+.bg-task-icon.error { color: var(--red); }
+@keyframes bgSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.bg-task-body { min-width: 0; }
+.bg-task-name { color: var(--text-primary); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bg-task-summary { color: var(--text-muted); font-size: 10px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bg-task-kind {
+  padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.bg-task-kind.bash { background: rgba(255,181,71,0.15); color: var(--amber); }
+.bg-task-kind.fork { background: rgba(245,140,181,0.15); color: var(--pink); }
+.bg-task-meta { color: var(--text-muted); font-size: 10px; min-width: 60px; text-align: right; }
 .edit-row { display: grid; grid-template-columns: 48px 18px 60px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 5px 10px; border-radius: 5px; font-family: 'JetBrains Mono', monospace; transition: background 0.2s; }
 .edit-row:hover { background: var(--surface-2); }
 .edit-row.live { background: rgba(74,158,255,0.08); border-left: 2px solid var(--accent); padding-left: 8px; border-radius: 0 5px 5px 0; }
@@ -592,6 +621,16 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
     <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 10px;">chờ event Edit/Write/Read…</div>
   </div>
 </div>
+</div>
+
+<div class="card bg-tasks-card">
+  <div class="panel-head">
+    <div class="lbl"><i class="ti ti-cloud-cog" style="color: var(--amber); margin-right: 4px;"></i>background tasks · lệnh chạy nền + sub-agent (live status)</div>
+    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="bg-count">0 tasks</div>
+  </div>
+  <div id="bg-tasks-list" class="bg-tasks-list">
+    <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 16px;">không có task nền đang chạy</div>
+  </div>
 </div>
 
 <div class="card">
@@ -875,6 +914,41 @@ function updateCounters(c, ctx) {
   setLbl('n-agent-count', (c.agents_spawned || 0) + ' spawned');
   setLbl('n-result-count', ((c.tool_calls || 0) - (c.errors || 0)) + ' ok');
   state.counters = c;
+}
+
+function renderBgTasks(snapshot) {
+  const list = document.getElementById('bg-tasks-list');
+  const countEl = document.getElementById('bg-count');
+  if (!list) return;
+  const bg = (snapshot.bg_tasks || []).map(b => ({...b, _kind: 'bash'}));
+  const fork = (snapshot.subagents || []).map(s => ({...s, _kind: 'fork'}));
+  const all = [...fork, ...bg].sort((a, b) => (b.started_at || 0) - (a.started_at || 0));
+  const running = all.filter(t => t.status === 'running').length;
+  countEl.textContent = `${all.length} tasks · ${running} đang chạy`;
+  if (all.length === 0) {
+    list.innerHTML = '<div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 16px;">không có task nền đang chạy</div>';
+    return;
+  }
+  const now = Date.now() / 1000;
+  const rows = all.map(t => {
+    const status = t.status || 'running';
+    const kindCls = t._kind === 'fork' ? 'fork' : 'bash';
+    const kindLabel = t._kind === 'fork' ? 'FORK' : 'BASH';
+    const iconCls = status === 'running' ? 'ti-loader-2 running' : (status === 'error' ? 'ti-alert-circle error' : 'ti-circle-check done');
+    const name = (t.name || t.id || '').toString().slice(0, 48);
+    const summary = (t.summary || '').toString().slice(0, 80);
+    const dur = t.duration ? `${t.duration.toFixed(1)}s` : (t.started_at ? `${(now - t.started_at).toFixed(0)}s ago` : '—');
+    return `<div class="bg-task-row ${status}">
+      <i class="ti ${iconCls} bg-task-icon ${status}"></i>
+      <div class="bg-task-body">
+        <div class="bg-task-name">${name}</div>
+        <div class="bg-task-summary">${summary}</div>
+      </div>
+      <span class="bg-task-kind ${kindCls}">${kindLabel}</span>
+      <div class="bg-task-meta">${dur}</div>
+    </div>`;
+  });
+  list.innerHTML = rows.join('');
 }
 
 function renderAgentTree(snapshot) {
@@ -1191,6 +1265,7 @@ async function loadSnapshot() {
     state.context = s.context;
     updateCounters(s.counters, s.context);
     renderAgentTree(s);
+    renderBgTasks(s);
     renderSkills(s);
     renderThinkings(s.thinking_recent || []);
     if (s.context_breakdown) {
