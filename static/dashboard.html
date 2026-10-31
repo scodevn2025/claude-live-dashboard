@@ -15,22 +15,26 @@
   --surface-1: #16161c;
   --surface-2: #1e1e26;
   --surface-3: #2a2a35;
-  --border: rgba(255,255,255,0.06);
-  --border-strong: rgba(255,255,255,0.12);
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.14);
   --text-primary: #ececec;
   --text-secondary: #9b9ba3;
   --text-muted: #6a6a73;
-  --accent: #4a9eff;
-  --accent-dim: rgba(74,158,255,0.12);
-  --green: #22d19a;
-  --amber: #ffb547;
-  --red: #ff5c5a;
-  --violet: #a287f4;
-  --orange: #ff8451;
-  --pink: #f58cb5;
-  --cyan: #4ad9e4;
+  /* v20: sat -10% — gentler accents, less eye fatigue */
+  --accent: #5aa3f0;
+  --accent-dim: rgba(90,163,240,0.12);
+  --green: #38caa0;
+  --amber: #f0b254;
+  --red: #ef6a68;
+  --violet: #a893ec;
+  --orange: #f08963;
+  --pink: #ed95b4;
+  --cyan: #5fcdd6;
   --gap: 16px;
+  --card-pad: 18px;
+  --card-radius: 14px;
   --list-height: 320px;
+  --inner-glow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: var(--bg); color: var(--text-primary); font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; line-height: 1.5; overflow-x: hidden; min-height: 100vh; }
@@ -39,7 +43,7 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .wrap > * { grid-column: 1 / -1; min-width: 0; }
 .sr-only { position: absolute; left: -9999px; }
 
-.topbar { display: flex; flex-wrap: wrap; gap: 12px var(--gap); justify-content: space-between; align-items: center; padding: 12px var(--gap); background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 12px; backdrop-filter: blur(10px); }
+.topbar { display: flex; flex-wrap: wrap; gap: 12px var(--gap); justify-content: space-between; align-items: center; padding: 12px var(--gap); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--card-radius); backdrop-filter: blur(10px); box-shadow: var(--inner-glow); }
 .sess { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; }
 #sess-id { overflow-wrap: anywhere; }
 .sess .dot { flex-shrink: 0; }
@@ -65,27 +69,34 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .hero-session .sub { overflow-wrap: anywhere; }
 .hero-metrics { display: flex; flex-shrink: 0; gap: 32px; }
 
-.card, .pipeline { background: linear-gradient(180deg, var(--surface-1), var(--surface-0)); border: 0.5px solid var(--border); border-radius: 12px; padding: var(--gap); position: relative; overflow: hidden; }
-.card.hero { border-left: 2px solid var(--accent); }
-.card-glow::before { content: ''; position: absolute; inset: -1px; border-radius: 12px; padding: 1px; background: linear-gradient(135deg, var(--accent), transparent 40%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0.4; }
+.card, .pipeline { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--card-radius); padding: var(--card-pad); position: relative; overflow: hidden; box-shadow: var(--inner-glow); transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+.card:hover { transform: translateY(-1px); border-color: var(--border-strong); box-shadow: var(--inner-glow), 0 6px 20px rgba(0,0,0,0.25); }
+.card.hero { border-left: 2px solid var(--accent); padding: 28px; }
+.card.hero:hover { transform: none; }
+.card-glow::before { content: ''; position: absolute; inset: -1px; border-radius: var(--card-radius); padding: 1px; background: linear-gradient(135deg, var(--accent), transparent 40%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; opacity: 0.35; }
 
-.lbl { font-size: 10px; color: var(--text-muted); text-transform: lowercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 500; }
-.val { font-size: 24px; font-weight: 500; font-feature-settings: 'tnum'; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; line-height: 1.1; }
-.val.sm { font-size: 16px; }
-.sub { font-size: 11px; color: var(--text-secondary); margin-top: 6px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+.lbl { font-size: 10px; color: var(--text-muted); text-transform: lowercase; letter-spacing: 0.04em; margin-bottom: 8px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.lbl i { font-size: 13px; }
+.val { font-size: 28px; font-weight: 600; font-feature-settings: 'tnum'; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; line-height: 1.15; letter-spacing: -0.01em; }
+.val.sm, .val-sm { font-size: 14px; font-weight: 500; }
+.val-xs { font-size: 12px; font-weight: 500; }
+.val-lg { font-size: 32px; font-weight: 600; }
+.val-xl { font-size: 44px; font-weight: 600; letter-spacing: -0.02em; }
+.sub { font-size: 11px; color: var(--text-secondary); margin-top: 7px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; line-height: 1.4; }
 
-.current { background: var(--accent-dim); padding: 12px var(--gap); margin-top: var(--gap); border-radius: 12px; border: 0.5px solid rgba(74,158,255,0.3); position: relative; overflow: hidden; }
-.current::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(74,158,255,0.1), transparent); }
+.current { background: var(--accent-dim); padding: 14px 16px; margin-top: 18px; border-radius: 12px; border: 1px solid rgba(90,163,240,0.26); position: relative; overflow: hidden; }
+.current::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(90,163,240,0.1), transparent); }
 .current.live::after { animation: sweep 2s ease-in-out infinite; }
 @keyframes sweep { 0% { left: -100%; } 100% { left: 100%; } }
-.current-name { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: var(--accent); }
-.current-cmd { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-secondary); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.current-name { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 14px; font-weight: 600; color: var(--accent); letter-spacing: 0.01em; }
+.current-cmd { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-secondary); margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
 
-.tl, .think-list, .cmds-list, .edits-list, .sess-list, .inv-list { max-height: var(--list-height); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
-.tl::-webkit-scrollbar { width: 4px; }
-.tl::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
-.tl { height: var(--list-height); padding-right: 4px; }
-.tl-row { display: grid; grid-template-columns: 56px 16px auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 5px 8px; margin-bottom: 2px; border-radius: 7px; font-size: 11px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; opacity: 0; transition: background 0.2s; }
+.tl, .think-list, .cmds-list, .edits-list, .sess-list, .inv-list { max-height: var(--list-height); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(90,163,240,0.3) transparent; }
+.tl::-webkit-scrollbar, .think-list::-webkit-scrollbar, .cmds-list::-webkit-scrollbar, .edits-list::-webkit-scrollbar, .sess-list::-webkit-scrollbar, .inv-list::-webkit-scrollbar { width: 6px; }
+.tl::-webkit-scrollbar-thumb { background: rgba(90,163,240,0.25); border-radius: 3px; }
+.tl::-webkit-scrollbar-thumb:hover { background: rgba(90,163,240,0.45); }
+.tl { height: var(--list-height); padding-right: 6px; }
+.tl-row { display: grid; grid-template-columns: 56px 16px auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 7px 8px; margin-bottom: 2px; border-radius: 8px; font-size: 11px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; opacity: 0; transition: background 0.2s; }
 .tl-row:hover { background: var(--surface-2); }
 .tl-time { color: var(--text-muted); font-size: 10px; }
 .tl-icon { font-size: 14px; text-align: center; }
@@ -113,7 +124,7 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .kinds-legend span { display: flex; align-items: center; gap: 4px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
 .kinds-legend .sw { width: 8px; height: 8px; border-radius: 2px; }
 
-#pipeline-compliance { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: var(--gap); padding-bottom: 12px; border-bottom: 0.5px solid var(--border); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+#pipeline-compliance { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: var(--gap); padding-bottom: 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
 .compliance-stages { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
 #pipeline-3d { width: 100%; height: 300px; position: relative; background: radial-gradient(ellipse at center, rgba(74,158,255,0.04), transparent 60%); border-radius: 12px; overflow: hidden; cursor: grab; }
 #pipeline-3d:active { cursor: grabbing; }
@@ -127,20 +138,21 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .panel-3d-container.webgl-off { display: none; }
 /* Force 3D off cho skills/kinds/loops — gom thành metrics strip compact 2D */
 #skills-3d, #kinds-3d, #loops-3d { display: none !important; }
-.cmd-think-row, .timeline-sess-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.cmd-think-row, .timeline-sess-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); margin: 16px 0; }
 .cmd-think-row .card, .timeline-sess-row .card { margin: 0 !important; }
 .cmd-think-row .cmds-list, .cmd-think-row .think-list { max-height: 260px; overflow-y: auto; }
 .timeline-sess-row .tl, .timeline-sess-row .sess-list { max-height: 320px; overflow-y: auto; }
-.metrics-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
-.metrics-strip .card { padding: 10px 12px; }
-.metrics-strip .card .lbl { font-size: 10px; margin-bottom: 6px; }
+.metrics-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--gap); margin: 16px 0; }
+.metrics-strip .card { padding: 14px 16px; }
+.metrics-strip .card .lbl { font-size: 11px; margin-bottom: 10px; }
 .metrics-strip .kinds-bar { height: 6px; }
-.metrics-strip .kinds-legend { font-size: 9px; gap: 6px; margin-top: 6px; }
-.metrics-strip .kinds-legend .sw { width: 7px; height: 7px; }
-.metrics-strip #skills-share { font-size: 10px; max-height: 90px; overflow-y: auto; padding-right: 4px; }
-.metrics-strip #loops-list { font-size: 10px; }
-.metrics-strip #hot-path { font-size: 9px; margin-top: 6px; }
-.metrics-strip .loop-row { padding: 3px 0; font-size: 10px; }
+.metrics-strip .kinds-legend { font-size: 10px; gap: 7px; margin-top: 8px; }
+.metrics-strip .kinds-legend .sw { width: 8px; height: 8px; }
+.metrics-strip #skills-share { font-size: 11px; max-height: 100px; overflow-y: auto; padding-right: 4px; }
+.metrics-strip #loops-list { font-size: 11px; }
+.metrics-strip #hot-path { font-size: 10px; margin-top: 8px; animation: hotPulse 2.4s ease-in-out infinite; }
+.metrics-strip .loop-row { padding: 4px 0; font-size: 11px; }
+@keyframes hotPulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
 .panel-2d-fallback { display: none; }  /* hidden khi 3D OK */
 .panel-2d-fallback.show-fallback { display: block; }
 
@@ -150,7 +162,7 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .edge { fill: none; stroke-width: 2; stroke-linecap: round; }
 .particle { fill: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
 
-.footer { padding: 12px var(--gap); background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 12px; font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; display: flex; flex-wrap: wrap; gap: 8px var(--gap); justify-content: space-between; }
+.footer { padding: 12px var(--gap); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--card-radius); font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; display: flex; flex-wrap: wrap; gap: 8px var(--gap); justify-content: space-between; box-shadow: var(--inner-glow); }
 .footer b { color: var(--text-primary); font-weight: 500; }
 
 .kind-tool_use { color: var(--accent); }
@@ -189,11 +201,27 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
 .loop-name { flex: 1; color: var(--text-primary); }
 .loop-meta { color: var(--text-secondary); font-size: 10px; }
 
-.ctx-wrap { padding-top: 12px; margin-top: var(--gap); border-top: 0.5px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-.ctx-bar { height: 4px; background: var(--surface-3); border-radius: 2px; margin-top: 4px; overflow: hidden; }
-.ctx-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--amber), var(--red)); border-radius: 2px; transition: width 0.6s ease-out; width: 0%; }
+.ctx-wrap { padding-top: 14px; margin-top: 18px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.ctx-bar { height: 8px; background: var(--surface-2); border-radius: 4px; margin-top: 8px; overflow: hidden; display: flex; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
+.ctx-bar .seg { height: 100%; min-width: 0; transition: flex-basis 0.6s ease-out; }
+.ctx-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--amber), var(--red)); border-radius: 4px; transition: width 0.6s ease-out; width: 0%; }
 .ctx-head { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; color: var(--text-secondary); }
-.ctx-head b { color: var(--text-primary); font-weight: 500; }
+.ctx-head b { color: var(--text-primary); font-weight: 600; }
+
+/* v20: context breakdown 2D segmented bar + legend grid */
+#context-breakdown-card .ctx-view-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary); padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 11px; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; transition: all 150ms ease; }
+#context-breakdown-card .ctx-view-toggle:hover { background: var(--surface-3); color: var(--text-primary); border-color: var(--border-strong); }
+#context-breakdown-card .ctx-view-toggle i { font-size: 13px; }
+#ctx-segbar { display: flex; width: 100%; height: 34px; border-radius: 10px; overflow: hidden; background: var(--surface-2); box-shadow: inset 0 1px 3px rgba(0,0,0,0.35); position: relative; }
+#ctx-segbar .ctx-seg { height: 100%; transition: flex-basis 0.6s ease-out, filter 150ms ease; cursor: default; position: relative; }
+#ctx-segbar .ctx-seg:hover { filter: brightness(1.35); z-index: 2; }
+#ctx-cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 20px; margin-top: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+#ctx-cats .ctx-cat { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+#ctx-cats .ctx-cat .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+#ctx-cats .ctx-cat .name { color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ctx-cats .ctx-cat .tok { color: var(--text-muted); font-size: 10px; }
+#ctx-cats .ctx-cat .pct { color: var(--text-secondary); font-size: 10px; width: 42px; text-align: right; }
+#ctx-cats .ctx-cat:hover .name { color: var(--accent); }
 </style>
 
 <style>
@@ -463,21 +491,30 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
   </div>
 </div>
 
-<!-- v19: context breakdown 3D stacked bar (mirror /context command) -->
+<!-- v20: context breakdown — 2D segmented bar default, 3D optional via toggle -->
 <div class="card" id="context-breakdown-card">
   <div class="panel-head">
     <div class="lbl"><i class="ti ti-stack-2" style="color: var(--violet);"></i> context breakdown · token allocation</div>
-    <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="ctx-bd-total">0 / 1M</div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="ctx-bd-total">0 / 1M</div>
+      <button type="button" class="ctx-view-toggle" id="ctx-toggle" title="toggle 2D/3D view" data-mode="2d"><i class="ti ti-cube"></i><span>3D</span></button>
+    </div>
   </div>
-  <div id="context-3d" style="height: 280px; position: relative; background: radial-gradient(ellipse at center, rgba(162,135,244,0.04), transparent 60%); border-radius: 10px; overflow: hidden;">
+  <!-- 2D view (default) -->
+  <div id="context-2d" style="padding: 4px 0 2px;">
+    <div id="ctx-segbar"></div>
+    <div id="ctx-cats"></div>
+  </div>
+  <!-- 3D view (hidden by default) -->
+  <div id="context-3d" style="display: none; height: 280px; position: relative; background: radial-gradient(ellipse at center, rgba(168,147,236,0.05), transparent 60%); border-radius: 10px; overflow: hidden;">
     <div class="pipeline-fallback" style="display:none; padding: 60px 20px; text-align:center; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 12px;">WebGL cần thiết</div>
   </div>
-  <div id="ctx-bd-legend" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+  <div id="ctx-bd-legend" style="display: none;"></div>
 </div>
 
 <div class="grid scene-grid">
   <div class="card">
-    <div class="lbl">agent tree · spawn hierarchy</div>
+    <div class="lbl"><i class="ti ti-sitemap" style="color: var(--accent);"></i> agent tree · spawn hierarchy</div>
     <div id="agent-tree-3d" class="panel-3d-container"></div>
     <div class="tree panel-2d-fallback" id="tree">
       <div class="tree-node has-children open"><i class="ti ti-robot tl-icon" style="color: var(--accent);"></i><span style="font-weight: 500;" id="tree-main-name">main session</span><span class="tree-status live">active</span></div>
@@ -485,7 +522,7 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
     </div>
   </div>
   <div class="card">
-    <div class="lbl">harness skills · time share</div>
+    <div class="lbl"><i class="ti ti-sparkles" style="color: var(--amber);"></i> harness skills · time share</div>
     <div id="skills-3d" class="panel-3d-container"></div>
     <div id="skills-share" class="panel-2d-fallback" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
       <div style="color: var(--text-muted); padding: 4px 0;">chưa có skill invocation</div>
@@ -493,13 +530,13 @@ body { padding: 24px; background: radial-gradient(1200px 600px at 20% -10%, rgba
     <div id="hot-path" style="margin-top: 8px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;"></div>
   </div>
   <div class="card">
-    <div class="lbl">event kinds breakdown</div>
+    <div class="lbl"><i class="ti ti-chart-pie" style="color: var(--pink);"></i> event kinds breakdown</div>
     <div id="kinds-3d" class="panel-3d-container"></div>
     <div class="kinds-bar panel-2d-fallback" id="kinds-bar"></div>
     <div class="kinds-legend" id="kinds-legend"></div>
   </div>
   <div class="card loops-section">
-    <div class="lbl">loops · lifecycle</div>
+    <div class="lbl"><i class="ti ti-infinity" style="color: var(--cyan);"></i> loops · lifecycle</div>
     <div id="loops-3d" class="panel-3d-container"></div>
     <div id="loops-list" class="panel-2d-fallback">
       <div class="loop-row" style="color: var(--text-muted);"><i class="ti ti-moon tl-icon"></i>no active loops</div>
@@ -742,9 +779,10 @@ function updateContextTokens(used, max) {
   state.ctxTokens = used;
   if (max) state.ctxMax = max;
   const pct = Math.min(100, (used / state.ctxMax) * 100);
-  document.getElementById('ctx-used').textContent = used >= 1000 ? (used/1000).toFixed(1) + 'k' : used;
-  document.getElementById('ctx-max').textContent = (state.ctxMax/1000).toFixed(0) + 'k';
-  document.getElementById('ctx-fill').style.width = pct + '%';
+  const u = document.getElementById('ctx-used'); if (u) u.textContent = used >= 1000 ? (used/1000).toFixed(1) + 'k' : used;
+  const m = document.getElementById('ctx-max'); if (m) m.textContent = (state.ctxMax/1000).toFixed(0) + 'k';
+  // v20: ctx-fill may be replaced by segmented bar once breakdown lands; guard null
+  const f = document.getElementById('ctx-fill'); if (f) f.style.width = pct + '%';
 }
 
 function renderLoops(loops) {
@@ -1155,7 +1193,10 @@ async function loadSnapshot() {
     renderAgentTree(s);
     renderSkills(s);
     renderThinkings(s.thinking_recent || []);
-    if (window.updateContext3D && s.context_breakdown) window.updateContext3D(s.context_breakdown);
+    if (s.context_breakdown) {
+      if (window.updateContext3D) window.updateContext3D(s.context_breakdown);
+      if (window.updateContext2D) window.updateContext2D(s.context_breakdown);
+    }
     document.getElementById('timeline').innerHTML = '';
     state.kindTally = {};
     s.events.slice(-50).forEach(renderEvent);
@@ -1206,7 +1247,10 @@ function connect() {
       renderAgentTree(s);
       renderSkills(s);
       renderThinkings(s.thinking_recent || []);
-      if (window.updateContext3D && s.context_breakdown) window.updateContext3D(s.context_breakdown);
+      if (s.context_breakdown) {
+        if (window.updateContext3D) window.updateContext3D(s.context_breakdown);
+        if (window.updateContext2D) window.updateContext2D(s.context_breakdown);
+      }
       // Session switch detect
       if (state.lastSessionId && s.session_id !== state.lastSessionId) {
         document.getElementById('session-name').textContent = s.session_id.slice(0, 8);
@@ -2998,14 +3042,15 @@ function initContext3D() {
 
   // Config: 10 categories (order = /context display)
   // ponytail: hardcoded palette here mirrors backend keys; expand khi backend thêm bucket.
+  // v20: palette -10% sat, matches CTX_CATS_2D hex strings
   const CATS = [
-    { key: 'messages',               label: 'Messages',      hex: 0x4a9eff },
-    { key: 'memory_files',           label: 'Memory',        hex: 0xa287f4 },
-    { key: 'mcp_tools',              label: 'MCP Tools',     hex: 0x22d19a },
-    { key: 'system_prompt',          label: 'System Prompt', hex: 0xffb547 },
-    { key: 'system_tools',           label: 'System Tools',  hex: 0xff8c42 },
-    { key: 'skills',                 label: 'Skills',        hex: 0xf58cb5 },
-    { key: 'mcp_server_instructions',label: 'MCP Server',    hex: 0x4ad9e4 },
+    { key: 'messages',               label: 'Messages',      hex: 0x5aa3f0 },
+    { key: 'memory_files',           label: 'Memory',        hex: 0xa893ec },
+    { key: 'mcp_tools',              label: 'MCP Tools',     hex: 0x38caa0 },
+    { key: 'system_prompt',          label: 'System Prompt', hex: 0xf0b254 },
+    { key: 'system_tools',           label: 'System Tools',  hex: 0xf08963 },
+    { key: 'skills',                 label: 'Skills',        hex: 0xed95b4 },
+    { key: 'mcp_server_instructions',label: 'MCP Server',    hex: 0x5fcdd6 },
     { key: 'custom_agents',          label: 'Agents',        hex: 0xecc970 },
     { key: 'autocompact_buffer',     label: 'Autocompact',   hex: 0xffe066 },
     { key: 'free',                   label: 'Free',          hex: 0x4a4a55 },
@@ -3081,6 +3126,93 @@ function initContext3D() {
 }
 
 console.log('[panels-3d] v19 ready — agent tree orbit · skills bars · kinds donut · loops rings · context breakdown');
+
+// ---- v20: Context breakdown 2D segmented bar + legend grid ----
+const CTX_CATS_2D = [
+  { key: 'messages',                label: 'Messages',      hex: '#5aa3f0' },
+  { key: 'memory_files',            label: 'Memory',        hex: '#a893ec' },
+  { key: 'mcp_tools',               label: 'MCP Tools',     hex: '#38caa0' },
+  { key: 'system_prompt',           label: 'System Prompt', hex: '#f0b254' },
+  { key: 'system_tools',            label: 'System Tools',  hex: '#f08963' },
+  { key: 'skills',                  label: 'Skills',        hex: '#ed95b4' },
+  { key: 'mcp_server_instructions', label: 'MCP Server',    hex: '#5fcdd6' },
+  { key: 'custom_agents',           label: 'Agents',        hex: '#ecc970' },
+  { key: 'autocompact_buffer',      label: 'Autocompact',   hex: '#ffe066' },
+  { key: 'free',                    label: 'Free',          hex: '#4a4a55' },
+];
+function fmtTok(n) {
+  if (n >= 1000) return (n/1000).toFixed(1) + 'k';
+  return String(n);
+}
+function updateContext2D(bd) {
+  if (!bd || !bd.total) return;
+  const total = bd.total;
+  const bar = document.getElementById('ctx-segbar');
+  const cats = document.getElementById('ctx-cats');
+  const totalEl = document.getElementById('ctx-bd-total');
+  if (!bar || !cats) return;
+  bar.innerHTML = CTX_CATS_2D.map(cat => {
+    const n = Math.max(0, bd[cat.key] || 0);
+    const pct = (n / total) * 100;
+    return `<div class="ctx-seg" style="flex: 0 0 ${pct}%; background: ${cat.hex};" title="${cat.label}: ${fmtTok(n)} (${pct.toFixed(1)}%)"></div>`;
+  }).join('');
+  cats.innerHTML = CTX_CATS_2D.map(cat => {
+    const n = Math.max(0, bd[cat.key] || 0);
+    const pct = (n / total) * 100;
+    return `<div class="ctx-cat">
+      <span class="sw" style="background: ${cat.hex};"></span>
+      <span class="name">${cat.label}</span>
+      <span class="tok">${fmtTok(n)}</span>
+      <span class="pct">${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+  const usedK = (bd.total - (bd.free || 0)) / 1000;
+  const totalK = bd.total / 1000;
+  if (totalEl) totalEl.textContent = `${usedK.toFixed(1)}k / ${totalK.toFixed(0)}k · ${((1 - (bd.free || 0) / bd.total) * 100).toFixed(0)}% used`;
+  // Also mirror into hero ctx-bar as mini segmented
+  updateHeroCtxBar(bd);
+}
+window.updateContext2D = updateContext2D;
+
+// ---- v20: Hero ctx-bar segmented mini (replace gradient with per-category segments) ----
+function updateHeroCtxBar(bd) {
+  if (!bd || !bd.total) return;
+  const bar = document.querySelector('.card.hero .ctx-bar');
+  if (!bar) return;
+  bar.innerHTML = CTX_CATS_2D.map(cat => {
+    const n = Math.max(0, bd[cat.key] || 0);
+    const pct = (n / bd.total) * 100;
+    return `<div class="seg" style="flex: 0 0 ${pct}%; background: ${cat.hex};" title="${cat.label}: ${fmtTok(n)}"></div>`;
+  }).join('');
+}
+window.updateHeroCtxBar = updateHeroCtxBar;
+
+// ---- v20: Context view toggle 2D ↔ 3D ----
+(function wireCtxToggle() {
+  const btn = document.getElementById('ctx-toggle');
+  const view2d = document.getElementById('context-2d');
+  const view3d = document.getElementById('context-3d');
+  const legend3d = document.getElementById('ctx-bd-legend');
+  if (!btn || !view2d || !view3d) return;
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    if (mode === '2d') {
+      view2d.style.display = 'none';
+      view3d.style.display = 'block';
+      if (legend3d) legend3d.style.display = 'flex';
+      btn.dataset.mode = '3d';
+      btn.innerHTML = '<i class="ti ti-chart-bar"></i><span>2D</span>';
+    } else {
+      view2d.style.display = 'block';
+      view3d.style.display = 'none';
+      if (legend3d) legend3d.style.display = 'none';
+      btn.dataset.mode = '2d';
+      btn.innerHTML = '<i class="ti ti-cube"></i><span>3D</span>';
+    }
+  });
+})();
+
+console.log('[polish] v20 ready — hero breath · context 2D segmented · card radius 14 · typography 600 · palette -10% sat');
 </script>
 </body>
 </html>
