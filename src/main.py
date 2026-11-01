@@ -26,9 +26,14 @@ AUTH_PASS = os.getenv("DASHBOARD_PASSWORD", "")
 _security = HTTPBasic(auto_error=False)
 
 
-def require_auth(creds: HTTPBasicCredentials | None = Depends(_security)):
+def require_auth(request: Request, creds: HTTPBasicCredentials | None = Depends(_security)):
     if not AUTH_USER or not AUTH_PASS:
         return  # no-auth mode (local dev)
+    # Bypass auth khi direct local (không qua Cloudflare tunnel).
+    # cloudflared add X-Forwarded-For + CF-Connecting-IP; direct curl không có.
+    cf_header = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for")
+    if not cf_header and request.client and request.client.host in ("127.0.0.1", "::1", "localhost"):
+        return
     if not creds:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
